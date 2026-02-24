@@ -1,0 +1,42 @@
+[build-system]
+requires = ["setuptools", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "openemr-chart-summarizer-agent"
+version = "0.1.0"
+description = "AI-powered patient chart summarizer for OpenEMR"
+authors = [{name = "OpenEMR Community"}]
+license = {text = "GPL-3.0"}
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi",
+    "uvicorn",
+    "pydantic",
+    "pydantic-settings",
+    "httpx",
+    "cryptography",
+    "langchain",
+    "langgraph",
+    "anthropic",
+    "openai",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.black]
+line-length = 88
+
+[tool.isort]
+profile = "black"
+
+[tool.pytest.ini_options]
+# pytest-asyncio 1.x requires explicit asyncio_mode configuration.
+# "auto" means all async test functions are treated as asyncio coroutines
+# without needing the @pytest.mark.asyncio decorator on each one.
+asyncio_mode = "auto"
+
+[tool.mypy]
+strict = true
+ignore_missing_imports = true

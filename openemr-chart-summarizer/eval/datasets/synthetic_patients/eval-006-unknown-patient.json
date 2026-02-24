@@ -1,0 +1,12 @@
+{
+  "case_id": "eval-006-unknown-patient",
+  "description": "RESILIENCE TEST: request for an unknown patient ID. The pipeline must fail gracefully — returning a SummaryResponse with status=failed or partial — not raise an exception.",
+  "summary_request": {
+    "patient_id": "UNKNOWN-999",
+    "specialty": "primary_care",
+    "requested_sections": ["demographics", "conditions", "medications", "allergies"]
+  },
+  "expected_items": {},
+  "min_confidence_level": null,
+  "expected_status": ["failed", "partial"]
+}

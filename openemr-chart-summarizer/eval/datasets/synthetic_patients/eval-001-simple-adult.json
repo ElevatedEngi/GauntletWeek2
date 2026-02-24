@@ -1,0 +1,19 @@
+{
+  "case_id": "eval-001-simple-adult",
+  "description": "Simple adult patient (TEST-001 Jane Doe) — all sections — primary care. Must surface Penicillin allergy and Lisinopril medication.",
+  "summary_request": {
+    "patient_id": "TEST-001",
+    "specialty": "primary_care",
+    "requested_sections": [
+      "demographics", "conditions", "medications", "allergies",
+      "labs", "vitals", "encounters", "immunizations"
+    ]
+  },
+  "expected_items": {
+    "allergies":   ["penicillin"],
+    "medications": ["lisinopril"],
+    "conditions":  ["hypertension"]
+  },
+  "min_confidence_level": "YELLOW",
+  "expected_status": ["complete", "partial"]
+}

@@ -1,0 +1,31 @@
+# Railway deployment configuration for the Chart Summarizer Agent.
+# Docs: https://docs.railway.com/reference/config-as-code
+#
+# This deploys ONLY the Python FastAPI agent.
+# The OpenEMR PHP module connects to this Railway URL from wherever it runs.
+#
+# Required environment variables to set in the Railway dashboard:
+#   LLM_PROVIDER   = anthropic          (or openai)
+#   LLM_API_KEY    = sk-ant-...         (your Anthropic key)
+#   AGENT_API_KEY  = <random 32+ chars> (shared secret — generate with:
+#                                        python -c "import secrets; print(secrets.token_hex(32))")
+#   CORS_ORIGINS   = *                  (or restrict to your OpenEMR domain)
+#
+# Optional:
+#   LLM_MODEL      = claude-haiku-4-5-20251001
+#   HIPAA_MODE     = true
+#   AUDIT_LOG_ENABLED = true
+
+[build]
+# Railway uses the repo root as build context, so paths in the Dockerfile
+# must be prefixed with "agent/".  The separate Dockerfile.railway at the
+# repo root handles this — Railway will use it automatically.
+builder = "DOCKERFILE"
+dockerfilePath = "Dockerfile.railway"
+
+[deploy]
+startCommand = "uvicorn chart_summarizer.main:app --host 0.0.0.0 --port $PORT"
+healthcheckPath = "/health"
+healthcheckTimeout = 300
+restartPolicyType = "on_failure"
+restartPolicyMaxRetries = 10

@@ -1,0 +1,18 @@
+{
+  "case_id": "eval-002-complex-elderly",
+  "description": "Complex elderly patient (TEST-002 Robert Smith, 82M) — cardiology context — polypharmacy and multi-morbidity. Must surface diabetes, CAD, and key medications.",
+  "summary_request": {
+    "patient_id": "TEST-002",
+    "specialty": "cardiology",
+    "requested_sections": [
+      "demographics", "conditions", "medications", "allergies",
+      "labs", "vitals", "encounters", "immunizations", "procedures"
+    ]
+  },
+  "expected_items": {
+    "conditions":  ["diabetes", "hypertension", "heart disease"],
+    "medications": ["metformin", "furosemide"]
+  },
+  "min_confidence_level": "YELLOW",
+  "expected_status": ["complete", "partial"]
+}

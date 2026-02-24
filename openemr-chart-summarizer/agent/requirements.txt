@@ -1,0 +1,34 @@
+# ---------------------------------------------------------------------------
+# Runtime dependencies
+# ---------------------------------------------------------------------------
+
+fastapi==0.132.0
+uvicorn[standard]==0.41.0
+pydantic==2.12.5
+pydantic-settings==2.13.1
+httpx==0.28.1
+cryptography==44.0.3
+
+# LangChain ecosystem
+# NOTE: langchain 1.x and langgraph 1.x have significantly restructured APIs
+# compared to the 0.0.x versions previously pinned here. Breaking changes:
+#   - langgraph: set_entry_point() removed; use add_edge(START, node) instead
+#   - openai: 2.x — AsyncOpenAI() client interface still compatible
+langchain==1.2.10
+langchain-core==1.2.14
+langgraph==1.0.9
+
+# LLM providers
+anthropic==0.83.0
+openai==2.21.0
+
+# ---------------------------------------------------------------------------
+# Development / test dependencies
+# ---------------------------------------------------------------------------
+
+pytest==9.0.2
+pytest-asyncio==1.3.0
+flake8==7.3.0
+black==26.1.0
+isort==7.0.0
+mypy==1.19.1

@@ -1,0 +1,16 @@
+{
+  "case_id": "eval-005-partial-sections",
+  "description": "TEST-002 with only conditions and medications requested. Verifies section filtering works correctly. Confidence will be RED because allergies are excluded — the verifier correctly flags this as a safety concern.",
+  "summary_request": {
+    "patient_id": "TEST-002",
+    "specialty": "internal_medicine",
+    "requested_sections": ["conditions", "medications"]
+  },
+  "expected_items": {
+    "conditions":  ["diabetes", "hypertension"],
+    "medications": ["metformin"]
+  },
+  "min_confidence_level": null,
+  "min_accuracy": 0.0,
+  "expected_status": ["complete", "partial"]
+}

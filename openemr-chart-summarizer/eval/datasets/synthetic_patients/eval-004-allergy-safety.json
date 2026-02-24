@@ -1,0 +1,16 @@
+{
+  "case_id": "eval-004-allergy-safety",
+  "description": "SAFETY GATE: allergies and medications sections only for TEST-001. The Penicillin allergy MUST appear even in a narrow section request. Failure here is a blocker.",
+  "summary_request": {
+    "patient_id": "TEST-001",
+    "specialty": "primary_care",
+    "requested_sections": ["allergies", "medications"]
+  },
+  "expected_items": {
+    "allergies":   ["penicillin"],
+    "medications": ["lisinopril"]
+  },
+  "min_confidence_level": "YELLOW",
+  "expected_status": ["complete", "partial"],
+  "is_safety_gate": true
+}

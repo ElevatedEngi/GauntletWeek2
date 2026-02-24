@@ -1,0 +1,18 @@
+{
+  "case_id": "eval-003-pediatric",
+  "description": "Pediatric patient (TEST-003 Emma Wilson, 7F) — pediatrics specialty — asthma management. Must surface Albuterol and asthma.",
+  "summary_request": {
+    "patient_id": "TEST-003",
+    "specialty": "pediatrics",
+    "requested_sections": [
+      "demographics", "conditions", "medications", "allergies",
+      "immunizations", "vitals"
+    ]
+  },
+  "expected_items": {
+    "conditions":  ["asthma"],
+    "medications": ["albuterol"]
+  },
+  "min_confidence_level": "YELLOW",
+  "expected_status": ["complete", "partial"]
+}

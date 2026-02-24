@@ -1,0 +1,65 @@
+services:
+  agent:
+    build: ./agent
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    environment:
+      # Override .env for Docker internal networking
+      OPENEMR_FHIR_BASE_URL: http://openemr:80/fhir
+    depends_on:
+      openemr:
+        condition: service_started
+    networks:
+      - openemr-network
+    restart: unless-stopped
+
+  openemr:
+    image: openemr/openemr:8.0.0
+    ports:
+      - "8080:80"
+      - "8300:8300"
+    environment:
+      MYSQL_HOST: mysql
+      MYSQL_ROOT_PASS: root
+      MYSQL_USER: openemr
+      MYSQL_PASS: openemr
+      OE_USER: admin
+      OE_PASS: pass
+      # Pass the shared API key to the PHP module via environment
+      CHART_SUMMARIZER_API_KEY: ${AGENT_API_KEY:-}
+      CHART_SUMMARIZER_AGENT_URL: http://agent:8000
+    volumes:
+      - openemr_data:/var/www/localhost/htdocs/openemr/sites/default/documents
+      - openemr_logs:/var/www/localhost/htdocs/openemr/sites/default/logs
+      # Mount the PHP module read-only into OpenEMR's modules directory
+      - ./module/ChartSummarizer:/var/www/localhost/htdocs/openemr/modules/ChartSummarizer:ro
+    depends_on:
+      mysql:
+        condition: service_started
+    networks:
+      - openemr-network
+    restart: unless-stopped
+
+  mysql:
+    image: mysql:8.0
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: openemr
+      MYSQL_USER: openemr
+      MYSQL_PASSWORD: openemr
+    volumes:
+      - mysql_data:/var/lib/mysql
+    networks:
+      - openemr-network
+    restart: unless-stopped
+
+volumes:
+  openemr_data:
+  openemr_logs:
+  mysql_data:
+
+networks:
+  openemr-network:
+    driver: bridge

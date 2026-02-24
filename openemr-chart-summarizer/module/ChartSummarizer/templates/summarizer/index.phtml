@@ -1,0 +1,159 @@
+<?php
+/**
+ * Chart Summarizer module — main summary viewer template.
+ *
+ * Copyright (C) 2026 OpenEMR Community
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program. If not, see <https://www.gnu.org/licenses/>.
+ *
+ * Template variables (set by SummarizerController::indexAction()):
+ *   $patient_pid   — OpenEMR patient PID (int)
+ *   $patient_name  — Display name for UI only (never sent to LLM or logs)
+ *   $specialties   — Array of available specialty options
+ *   $saved_summaries — Array of previously approved summaries
+ */
+?>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title><?php echo xlt('AI Chart Summary'); ?></title>
+    <?php Header::setupHeader(['opener', 'datetime-picker']); ?>
+    <link rel="stylesheet" href="<?php echo $GLOBALS['webroot']; ?>/modules/ChartSummarizer/public/css/summarizer.css">
+</head>
+<body class="body_top">
+
+<div class="container-fluid mt-3" id="chart-summarizer-app">
+
+    <!-- ------------------------------------------------------------------ -->
+    <!-- Header                                                               -->
+    <!-- ------------------------------------------------------------------ -->
+    <div class="row mb-3">
+        <div class="col">
+            <h2>
+                <?php echo xlt('AI Patient Chart Summary'); ?>
+                <span class="badge bg-warning text-dark ms-2"><?php echo xlt('DRAFT'); ?></span>
+            </h2>
+            <p class="text-muted small">
+                <?php echo xlt('AI-generated summaries require clinician review before clinical use.'); ?>
+            </p>
+        </div>
+    </div>
+
+    <!-- ------------------------------------------------------------------ -->
+    <!-- Generation Controls                                                  -->
+    <!-- ------------------------------------------------------------------ -->
+    <div class="card mb-4" id="summary-controls">
+        <div class="card-body">
+            <form id="summary-request-form">
+                <input type="hidden" name="patient_pid" value="<?php echo attr($patient_pid ?? ''); ?>">
+
+                <div class="row g-3">
+                    <div class="col-md-4">
+                        <label for="specialty-select" class="form-label">
+                            <?php echo xlt('Specialty Context'); ?>
+                        </label>
+                        <select id="specialty-select" name="specialty" class="form-select">
+                            <!-- TODO: Populate from $specialties variable -->
+                            <option value="primary_care"><?php echo xlt('Primary Care'); ?></option>
+                            <option value="cardiology"><?php echo xlt('Cardiology'); ?></option>
+                            <option value="psychiatry"><?php echo xlt('Psychiatry'); ?></option>
+                            <option value="pediatrics"><?php echo xlt('Pediatrics'); ?></option>
+                        </select>
+                    </div>
+
+                    <div class="col-md-4">
+                        <label for="date-range" class="form-label">
+                            <?php echo xlt('Data Window (months)'); ?>
+                        </label>
+                        <select id="date-range" name="months" class="form-select">
+                            <option value="3"><?php echo xlt('Last 3 months'); ?></option>
+                            <option value="6"><?php echo xlt('Last 6 months'); ?></option>
+                            <option value="12" selected><?php echo xlt('Last 12 months'); ?></option>
+                            <option value="24"><?php echo xlt('Last 2 years'); ?></option>
+                            <option value="0"><?php echo xlt('All available data'); ?></option>
+                        </select>
+                    </div>
+
+                    <div class="col-md-4 d-flex align-items-end">
+                        <button type="submit" id="generate-btn" class="btn btn-primary w-100">
+                            <span id="generate-btn-text"><?php echo xlt('Generate Summary'); ?></span>
+                            <span id="generate-btn-spinner" class="spinner-border spinner-border-sm ms-2 d-none" role="status"></span>
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- ------------------------------------------------------------------ -->
+    <!-- Summary Output                                                       -->
+    <!-- ------------------------------------------------------------------ -->
+    <div id="summary-output" class="d-none">
+
+        <!-- Confidence indicator -->
+        <div id="confidence-banner" class="alert mb-3" role="alert">
+            <!-- Populated by JavaScript -->
+        </div>
+
+        <!-- AI disclaimer -->
+        <div class="alert alert-warning d-flex align-items-center mb-3" role="alert">
+            <i class="fa fa-exclamation-triangle me-2"></i>
+            <div>
+                <?php echo xlt('This summary was generated by AI and requires clinician review before clinical use. Do not act on this summary without verifying against the original patient record.'); ?>
+            </div>
+        </div>
+
+        <!-- Summary content (Markdown rendered to HTML) -->
+        <div class="card mb-3">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <strong><?php echo xlt('Chart Summary — DRAFT'); ?></strong>
+                <span id="summary-meta" class="text-muted small"></span>
+            </div>
+            <div class="card-body" id="summary-content">
+                <!-- Populated by JavaScript -->
+            </div>
+        </div>
+
+        <!-- Action buttons -->
+        <div class="d-flex gap-2 mb-4">
+            <button id="approve-btn" class="btn btn-success">
+                <?php echo xlt('Approve & Save to Chart'); ?>
+            </button>
+            <button id="flag-btn" class="btn btn-warning">
+                <?php echo xlt('Flag for Review'); ?>
+            </button>
+            <button id="reject-btn" class="btn btn-outline-danger">
+                <?php echo xlt('Reject Summary'); ?>
+            </button>
+            <button id="feedback-btn" class="btn btn-outline-secondary ms-auto">
+                <?php echo xlt('Send Feedback'); ?>
+            </button>
+        </div>
+    </div>
+
+    <!-- ------------------------------------------------------------------ -->
+    <!-- Error state                                                           -->
+    <!-- ------------------------------------------------------------------ -->
+    <div id="summary-error" class="alert alert-danger d-none" role="alert">
+        <!-- Populated by JavaScript -->
+    </div>
+
+</div><!-- /#chart-summarizer-app -->
+
+<script src="<?php echo $GLOBALS['webroot']; ?>/modules/ChartSummarizer/public/js/summarizer.js"></script>
+
+</body>
+</html>

@@ -1,0 +1,86 @@
+/*
+ * Chart Summarizer module stylesheet.
+ *
+ * Copyright (C) 2026 OpenEMR Community
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program. If not, see <https://www.gnu.org/licenses/>.
+ */
+
+/* ---------------------------------------------------------------------------
+ * Confidence level banners
+ * --------------------------------------------------------------------------- */
+
+.confidence-green {
+    background-color: #d1e7dd;
+    border-color: #badbcc;
+    color: #0f5132;
+}
+
+.confidence-yellow {
+    background-color: #fff3cd;
+    border-color: #ffecb5;
+    color: #664d03;
+}
+
+.confidence-red {
+    background-color: #f8d7da;
+    border-color: #f5c2c7;
+    color: #842029;
+}
+
+/* ---------------------------------------------------------------------------
+ * Summary content area
+ * --------------------------------------------------------------------------- */
+
+#summary-content {
+    font-size: 0.95rem;
+    line-height: 1.6;
+}
+
+#summary-content h2,
+#summary-content h3 {
+    margin-top: 1.25rem;
+    margin-bottom: 0.5rem;
+    color: #2c3e50;
+}
+
+#summary-content .citation {
+    font-size: 0.8rem;
+    color: #6c757d;
+    background-color: #f8f9fa;
+    padding: 0.1rem 0.3rem;
+    border-radius: 3px;
+}
+
+/* ---------------------------------------------------------------------------
+ * Loading spinner overlay
+ * --------------------------------------------------------------------------- */
+
+#summary-loading {
+    min-height: 200px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* ---------------------------------------------------------------------------
+ * Draft watermark
+ * --------------------------------------------------------------------------- */
+
+.draft-badge {
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+}
