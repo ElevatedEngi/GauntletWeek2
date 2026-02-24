@@ -51,20 +51,40 @@ class FHIRTool(ABC):
     Abstract base class for all FHIR R4 data retrieval tools.
 
     Subclasses implement one specific FHIR query (e.g. get_medications).
-    The base class handles shared concerns: OAuth token refresh, retry logic,
-    and error normalisation.
+    The base class owns a lazily-initialised FHIRClient and exposes
+    ``_fhir_get()`` and ``_fhir_paginate()`` helpers to subclasses.
     """
 
     def __init__(self, fhir_base_url: Optional[str] = None) -> None:
         """
         Initialise the tool with the FHIR base URL.
 
+        The FHIRClient is created lazily on the first request so that
+        import-time instantiation (e.g. during test collection) does not
+        require OpenEMR credentials to be present in the environment.
+
         Args:
             fhir_base_url: Override the default FHIR base URL from config.
-                           Useful for injecting mock URLs in tests.
+                           Useful for injecting test URLs.
         """
         self._fhir_base_url = fhir_base_url or settings.OPENEMR_FHIR_BASE_URL
-        # TODO: Initialise httpx.AsyncClient with OAuth2 bearer token refresh here
+        self._client: Any = None  # Lazily initialised FHIRClient
+
+    # ------------------------------------------------------------------
+    # Internal: shared client
+    # ------------------------------------------------------------------
+
+    def _get_client(self) -> Any:
+        """Return (or lazily create) the shared FHIRClient for this tool."""
+        if self._client is None:
+            from chart_summarizer.tools.fhir.client import FHIRClient
+
+            self._client = FHIRClient(
+                fhir_base_url=self._fhir_base_url,
+                client_id=settings.OPENEMR_CLIENT_ID,
+                client_secret=settings.OPENEMR_CLIENT_SECRET.get_secret_value(),
+            )
+        return self._client
 
     # ------------------------------------------------------------------
     # Abstract interface
@@ -97,25 +117,83 @@ class FHIRTool(ABC):
         raise NotImplementedError
 
     # ------------------------------------------------------------------
-    # Shared helpers (to be implemented)
+    # Shared FHIR helpers
     # ------------------------------------------------------------------
 
-    async def _get_oauth_token(self) -> str:
+    async def _fhir_get(
+        self,
+        path: str,
+        params: Optional[dict[str, Any]] = None,
+    ) -> dict[str, Any]:
         """
-        Obtain or refresh the OAuth2 bearer token for the FHIR API.
+        Authenticated GET request to the FHIR API.
 
-        TODO: Implement client-credentials flow against OpenEMR's OAuth endpoint.
-              Cache the token and refresh before expiry.
+        For Bundle responses the method transparently follows all
+        ``link[rel=next]`` pagination links (up to 10 pages) and returns a
+        synthetic merged Bundle so that callers never see a truncated result.
+
+        For non-Bundle responses (e.g. ``/Patient/{id}``), returns the raw
+        resource dict unchanged.
+
+        Args:
+            path:   URL path relative to the FHIR base (e.g. ``/Patient/123``).
+            params: Optional FHIR search parameters.
+
+        Returns:
+            Parsed JSON dict (merged Bundle or individual resource).
         """
-        raise NotImplementedError("OAuth token retrieval is not yet implemented.")
+        client = self._get_client()
+        first_page = await client.get(path, params)
 
-    async def _fhir_get(self, path: str, params: Optional[dict[str, Any]] = None) -> dict[str, Any]:
+        if first_page.get("resourceType") != "Bundle":
+            # Individual resource (e.g. Patient) — return as-is
+            return first_page
+
+        # Bundle: check if there are more pages
+        if not client._next_url(first_page):
+            # Single-page Bundle — no pagination needed
+            return first_page
+
+        # Multi-page: collect first page entries then use paginate() for rest
+        all_entries: list[dict[str, Any]] = list(first_page.get("entry") or [])
+
+        # paginate() returns flat resource list starting from page 1;
+        # we already have page 1, so re-paginate from the next link directly.
+        # Build a merged entry list: wrap resources in entry dicts for compatibility
+        # with extract_bundle_entries().
+        next_url = client._next_url(first_page)
+        page_count = 1
+        from chart_summarizer.tools.fhir.client import _MAX_PAGES
+
+        while next_url and page_count < _MAX_PAGES:
+            headers = await client._auth_headers()
+            import asyncio
+            async with client._semaphore:
+                page = await client._get_with_retry(next_url, headers, {})
+            for entry in page.get("entry") or []:
+                if "resource" in entry:
+                    all_entries.append(entry)
+            next_url = client._next_url(page)
+            page_count += 1
+
+        return {**first_page, "entry": all_entries}
+
+    async def _fhir_paginate(
+        self,
+        path: str,
+        params: Optional[dict[str, Any]] = None,
+    ) -> list[dict[str, Any]]:
         """
-        Perform an authenticated GET request against the FHIR API.
+        Follow FHIR Bundle pagination and return a flat list of resource dicts.
 
-        Handles 401 token refresh, 429 rate limiting (exponential backoff),
-        and 500 server errors (retry ×2).
+        Convenience wrapper around FHIRClient.paginate() for tools that prefer
+        working directly with resource lists rather than Bundle dicts.
 
-        TODO: Implement using httpx.AsyncClient with Authorization header.
+        Args:
+            path:   Search path, e.g. ``/MedicationRequest``.
+            params: FHIR search parameters.
+
+        Returns:
+            Flat list of FHIR resource dicts from all pages.
         """
-        raise NotImplementedError("FHIR HTTP client is not yet implemented.")
+        return await self._get_client().paginate(path, params)

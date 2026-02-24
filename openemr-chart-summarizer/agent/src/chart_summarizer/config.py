@@ -91,6 +91,12 @@ class Settings(BaseSettings):
         le=500,
         description="Cap on the number of encounters included in a single summary.",
     )
+    MAX_LAB_RESULTS: int = Field(
+        default=50,
+        ge=1,
+        le=500,
+        description="Maximum number of lab results fetched per summary request.",
+    )
 
     # --- Agent API Authentication ---
     AGENT_API_KEY: SecretStr = Field(

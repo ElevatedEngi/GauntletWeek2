@@ -1,0 +1,32 @@
+{
+  "resourceType": "Bundle",
+  "type": "searchset",
+  "total": 1,
+  "entry": [
+    {
+      "resource": {
+        "resourceType": "Procedure",
+        "id": "proc-001",
+        "status": "completed",
+        "code": {
+          "coding": [
+            {"system": "http://www.ama-assn.org/go/cpt", "code": "71046", "display": "Radiologic examination, chest; 2 views"},
+            {"system": "http://snomed.info/sct", "code": "399208008", "display": "Radiography of chest"}
+          ],
+          "text": "Chest X-Ray"
+        },
+        "subject": {"reference": "Patient/pid-001"},
+        "performedDateTime": "2025-06-10",
+        "performer": [
+          {
+            "actor": {"display": "Dr. James Lee"}
+          }
+        ],
+        "outcome": {
+          "coding": [{"system": "http://snomed.info/sct", "code": "385669000", "display": "Successful"}],
+          "text": "Normal"
+        }
+      }
+    }
+  ]
+}

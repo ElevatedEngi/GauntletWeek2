@@ -1,0 +1,35 @@
+{
+  "resourceType": "Patient",
+  "id": "pid-001",
+  "name": [
+    {
+      "use": "official",
+      "family": "Doe",
+      "given": ["Jane", "Marie"]
+    }
+  ],
+  "birthDate": "1989-03-15",
+  "gender": "female",
+  "extension": [
+    {
+      "url": "http://hl7.org/fhir/us/core/StructureDefinition/us-core-race",
+      "extension": [
+        {"url": "text", "valueString": "White"}
+      ]
+    },
+    {
+      "url": "http://hl7.org/fhir/us/core/StructureDefinition/us-core-ethnicity",
+      "extension": [
+        {"url": "text", "valueString": "Not Hispanic or Latino"}
+      ]
+    }
+  ],
+  "communication": [
+    {
+      "language": {
+        "coding": [{"system": "urn:ietf:bcp:47", "code": "en", "display": "English"}]
+      },
+      "preferred": true
+    }
+  ]
+}

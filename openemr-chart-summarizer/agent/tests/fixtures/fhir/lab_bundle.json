@@ -1,0 +1,46 @@
+{
+  "resourceType": "Bundle",
+  "type": "searchset",
+  "total": 2,
+  "entry": [
+    {
+      "resource": {
+        "resourceType": "Observation",
+        "id": "lab-001",
+        "status": "final",
+        "category": [
+          {"coding": [{"system": "http://terminology.hl7.org/CodeSystem/observation-category", "code": "laboratory"}]}
+        ],
+        "code": {
+          "coding": [{"system": "http://loinc.org", "code": "4548-4", "display": "Hemoglobin A1c/Hemoglobin.total in Blood"}],
+          "text": "HbA1c"
+        },
+        "subject": {"reference": "Patient/pid-001"},
+        "effectiveDateTime": "2025-11-01T09:00:00Z",
+        "valueQuantity": {"value": 7.2, "unit": "%", "system": "http://unitsofmeasure.org", "code": "%"},
+        "referenceRange": [{"text": "< 5.7%"}],
+        "interpretation": [
+          {"coding": [{"system": "http://terminology.hl7.org/CodeSystem/v3-ObservationInterpretation", "code": "H", "display": "High"}]}
+        ]
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Observation",
+        "id": "lab-002",
+        "status": "final",
+        "category": [
+          {"coding": [{"system": "http://terminology.hl7.org/CodeSystem/observation-category", "code": "laboratory"}]}
+        ],
+        "code": {
+          "coding": [{"system": "http://loinc.org", "code": "2160-0", "display": "Creatinine [Mass/volume] in Serum or Plasma"}],
+          "text": "Creatinine"
+        },
+        "subject": {"reference": "Patient/pid-001"},
+        "effectiveDateTime": "2025-11-01T09:00:00Z",
+        "valueQuantity": {"value": 0.9, "unit": "mg/dL", "system": "http://unitsofmeasure.org", "code": "mg/dL"},
+        "referenceRange": [{"text": "0.6-1.2 mg/dL"}]
+      }
+    }
+  ]
+}

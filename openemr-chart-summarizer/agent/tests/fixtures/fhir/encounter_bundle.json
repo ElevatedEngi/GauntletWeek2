@@ -1,0 +1,47 @@
+{
+  "resourceType": "Bundle",
+  "type": "searchset",
+  "total": 1,
+  "entry": [
+    {
+      "resource": {
+        "resourceType": "Encounter",
+        "id": "enc-001",
+        "status": "finished",
+        "class": {
+          "system": "http://terminology.hl7.org/CodeSystem/v3-ActCode",
+          "code": "AMB",
+          "display": "ambulatory"
+        },
+        "type": [
+          {
+            "coding": [{"system": "http://snomed.info/sct", "code": "11429006", "display": "Consultation"}],
+            "text": "Office Visit"
+          }
+        ],
+        "subject": {"reference": "Patient/pid-001"},
+        "participant": [
+          {
+            "individual": {"display": "Dr. Sarah Smith"}
+          }
+        ],
+        "period": {
+          "start": "2025-11-15T09:00:00Z",
+          "end": "2025-11-15T09:30:00Z"
+        },
+        "reasonCode": [
+          {
+            "coding": [{"system": "http://snomed.info/sct", "code": "38341003", "display": "Hypertensive disorder"}],
+            "text": "Hypertension follow-up"
+          }
+        ],
+        "diagnosis": [
+          {
+            "condition": {"display": "Hypertension"},
+            "use": {"coding": [{"code": "chief-complaint"}]}
+          }
+        ]
+      }
+    }
+  ]
+}

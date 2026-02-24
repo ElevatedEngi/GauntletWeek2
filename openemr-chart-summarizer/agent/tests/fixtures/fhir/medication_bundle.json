@@ -1,0 +1,53 @@
+{
+  "resourceType": "Bundle",
+  "type": "searchset",
+  "total": 2,
+  "entry": [
+    {
+      "resource": {
+        "resourceType": "MedicationRequest",
+        "id": "med-001",
+        "status": "active",
+        "medicationCodeableConcept": {
+          "coding": [{"system": "http://www.nlm.nih.gov/research/umls/rxnorm", "code": "197361", "display": "Lisinopril 10 MG Oral Tablet"}],
+          "text": "Lisinopril 10mg"
+        },
+        "subject": {"reference": "Patient/pid-001"},
+        "authoredOn": "2020-01-20",
+        "requester": {"display": "Dr. Sarah Smith"},
+        "dosageInstruction": [
+          {
+            "text": "10mg once daily",
+            "doseAndRate": [
+              {"doseQuantity": {"value": 10, "unit": "mg"}}
+            ],
+            "timing": {"repeat": {"frequency": 1, "period": 1, "periodUnit": "d"}}
+          }
+        ]
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "MedicationRequest",
+        "id": "med-002",
+        "status": "active",
+        "medicationCodeableConcept": {
+          "coding": [{"system": "http://www.nlm.nih.gov/research/umls/rxnorm", "code": "860975", "display": "Metformin 500 MG Oral Tablet"}],
+          "text": "Metformin 500mg"
+        },
+        "subject": {"reference": "Patient/pid-001"},
+        "authoredOn": "2018-07-01",
+        "requester": {"display": "Dr. Sarah Smith"},
+        "dosageInstruction": [
+          {
+            "text": "500mg twice daily with meals",
+            "doseAndRate": [
+              {"doseQuantity": {"value": 500, "unit": "mg"}}
+            ],
+            "timing": {"repeat": {"frequency": 2, "period": 1, "periodUnit": "d"}}
+          }
+        ]
+      }
+    }
+  ]
+}
