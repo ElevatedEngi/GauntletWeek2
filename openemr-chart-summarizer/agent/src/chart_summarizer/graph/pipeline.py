@@ -16,76 +16,50 @@
 """
 LangGraph pipeline for the Chart Summarizer Agent.
 
-Graph topology (single agent, multi-step):
+Graph topology:
 
-  retrieve → structure → summarize → verify → END
+  retrieve_data → [conditional] → structure_data → generate_summary
+                       |                                   ↓
+                  (all failed)                       verify_summary → [conditional] → format_output
+                       |                                                    |
+                       └──────────── format_output ◄────────────────────── ┘
+                                                       (low confidence &
+                                                        retry_count < 1 → back to generate_summary)
 
-Each node is an async function that accepts the current PipelineState and
-returns a dict of updated state keys.  Node implementations live inside
-``create_pipeline()`` as closures so that tools and the LLM provider can be
-injected at construction time (enabling easy testing without real APIs).
+Conditional edges:
+  - After retrieve_data: if ALL tools failed → skip to format_output
+  - After verify_summary: if confidence < 0.50 AND retry_count < 1 → regenerate
+
+Backward-compat note: the helper functions _build_system_prompt, _extract_citations,
+_fmt_section, _format_patient_data, _sort_by_date are preserved here so existing
+tests that import from chart_summarizer.graph.pipeline continue to work.
 """
 
-import asyncio
 import logging
 import re
-from datetime import date, timedelta
-from typing import Any, Optional, TypedDict
+from typing import Any, Optional
 
 from langgraph.graph import END, START, StateGraph
 
-from chart_summarizer.config import settings
+from chart_summarizer.graph.nodes import (
+    _LIST_FIELDS,
+    format_output_node,
+    make_generate_summary_node,
+    make_retrieve_data_node,
+    structure_data_node,
+    verify_summary_node,
+)
+from chart_summarizer.graph.state import SummarizerState
 
 logger = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------------------------
-# Pipeline state
+# Backward-compatible helpers (kept so existing test imports still work)
 # ---------------------------------------------------------------------------
 
+_SOURCE_RE = re.compile(r"\[Source:\s*([^\]]+)\]")
 
-class PipelineState(TypedDict):
-    """
-    Shared state that flows through every node in the pipeline.
-
-    Each node reads what it needs and writes back its outputs.
-    All keys are optional so nodes only set what they produce.
-    """
-
-    # Input
-    patient_id: str
-    specialty: str
-    date_range_months: int
-    requested_sections: list[str]
-    requesting_provider_id: Optional[str]
-
-    # Produced by retrieve node
-    patient_data: dict[str, Any]
-    retrieval_errors: list[str]
-
-    # Produced by structure node
-    structured_data: dict[str, Any]
-
-    # Produced by summarize node
-    summary_text: str
-    citations: list[dict[str, Any]]
-    model_used: str
-    input_tokens: int
-    output_tokens: int
-
-    # Produced by verify node
-    verification_result: dict[str, Any]
-    confidence_level: str
-
-    # Pipeline metadata
-    pipeline_errors: list[str]
-
-
-# ---------------------------------------------------------------------------
-# Module-level constants
-# ---------------------------------------------------------------------------
-
-# Maps tool_name → patient_data section key
 _TOOL_SECTION_MAP: dict[str, str] = {
     "get_patient_demographics": "demographics",
     "get_problem_list": "conditions",
@@ -98,7 +72,6 @@ _TOOL_SECTION_MAP: dict[str, str] = {
     "get_procedures": "procedures",
 }
 
-# Sort field per section (for date-descending ordering in structure_node)
 _DATE_SORT_FIELD: dict[str, str] = {
     "conditions": "onset_date",
     "medications": "start_date",
@@ -109,13 +82,6 @@ _DATE_SORT_FIELD: dict[str, str] = {
     "procedures": "performed_date",
 }
 
-# Tools that should NOT be date-filtered (return all records always)
-_NO_DATE_FILTER_TOOLS = frozenset({"get_patient_demographics", "get_allergies"})
-
-# Regex to find [Source: <id>] citations in LLM output
-_SOURCE_RE = re.compile(r"\[Source:\s*([^\]]+)\]")
-
-# Section ID field names (used when building citation source_type index)
 _SECTION_ID_FIELDS: dict[str, tuple[str, ...]] = {
     "demographics": ("fhir_id", "patient_id"),
     "conditions": ("condition_id",),
@@ -129,18 +95,10 @@ _SECTION_ID_FIELDS: dict[str, tuple[str, ...]] = {
 }
 
 
-# ---------------------------------------------------------------------------
-# Shared helpers (module-level, pure functions)
-# ---------------------------------------------------------------------------
-
-
 def _sort_by_date(records: list[dict[str, Any]], field: str) -> list[dict[str, Any]]:
-    """Sort records by a date-string field, most recent first. None sorts last."""
-
     def _key(r: dict[str, Any]) -> str:
         v = r.get(field)
         return str(v) if v else ""
-
     return sorted(records, key=_key, reverse=True)
 
 
@@ -173,7 +131,6 @@ def _fmt_section(title: str, lines: list[str]) -> str:
 
 
 def _format_patient_data(structured_data: dict[str, Any]) -> str:
-    """Render structured patient data as a human-readable block for the LLM."""
     sections: list[str] = []
 
     if demo := structured_data.get("demographics"):
@@ -184,10 +141,8 @@ def _format_patient_data(structured_data: dict[str, Any]) -> str:
             f"Sex: {demo.get('sex', 'Unknown')}",
         ]
         for label, field in (
-            ("Race", "race"),
-            ("Ethnicity", "ethnicity"),
-            ("Language", "primary_language"),
-            ("Insurance", "insurance_name"),
+            ("Race", "race"), ("Ethnicity", "ethnicity"),
+            ("Language", "primary_language"), ("Insurance", "insurance_name"),
             ("PCP", "primary_care_provider"),
         ):
             if demo.get(field):
@@ -238,16 +193,12 @@ def _format_patient_data(structured_data: dict[str, Any]) -> str:
             unit = f" {lab['unit']}" if lab.get("unit") else ""
             ref = (
                 f" [ref: {lab['reference_range']}]"
-                if lab.get("reference_range")
-                else ""
+                if lab.get("reference_range") else ""
             )
-            interp = (
-                f" ({lab['interpretation']})" if lab.get("interpretation") else ""
-            )
+            interp = f" ({lab['interpretation']})" if lab.get("interpretation") else ""
             dt = (
                 f" | date: {str(lab.get('effective_date', ''))[:10]}"
-                if lab.get("effective_date")
-                else ""
+                if lab.get("effective_date") else ""
             )
             lines.append(
                 f"[{lab.get('lab_id', '?')}] "
@@ -261,8 +212,7 @@ def _format_patient_data(structured_data: dict[str, Any]) -> str:
             unit = f" {v['unit']}" if v.get("unit") else ""
             dt = (
                 f" | date: {str(v.get('effective_date', ''))[:10]}"
-                if v.get("effective_date")
-                else ""
+                if v.get("effective_date") else ""
             )
             lines.append(
                 f"[{v.get('vital_id', '?')}] "
@@ -277,13 +227,11 @@ def _format_patient_data(structured_data: dict[str, Any]) -> str:
             prov = f" | provider: {e['provider']}" if e.get("provider") else ""
             cc = (
                 f"\n  Chief complaint: {e['chief_complaint']}"
-                if e.get("chief_complaint")
-                else ""
+                if e.get("chief_complaint") else ""
             )
             dx = (
                 f"\n  Diagnoses: {', '.join(e['diagnoses'])}"
-                if e.get("diagnoses")
-                else ""
+                if e.get("diagnoses") else ""
             )
             lines.append(
                 f"[{e.get('encounter_id', '?')}] "
@@ -319,17 +267,11 @@ def _format_patient_data(structured_data: dict[str, Any]) -> str:
 def _extract_citations(
     text: str, patient_data: dict[str, Any]
 ) -> list[dict[str, Any]]:
-    """Parse [Source: <id>] citations from LLM output into serialisable dicts."""
     _SECTION_TYPE: dict[str, str] = {
-        "conditions": "condition",
-        "medications": "medication",
-        "allergies": "allergy",
-        "labs": "lab",
-        "vitals": "vital",
-        "encounters": "encounter",
-        "immunizations": "immunization",
-        "procedures": "procedure",
-        "demographics": "demographics",
+        "conditions": "condition", "medications": "medication",
+        "allergies": "allergy", "labs": "lab", "vitals": "vital",
+        "encounters": "encounter", "immunizations": "immunization",
+        "procedures": "procedure", "demographics": "demographics",
     }
     id_to_type: dict[str, str] = {}
     for section, data in patient_data.items():
@@ -353,18 +295,52 @@ def _extract_citations(
         source_id = match.group(1).strip()
         line_start = text.rfind("\n", 0, match.start()) + 1
         line_end = text.find("\n", match.end())
-        line = text[line_start : (line_end if line_end != -1 else len(text))]
+        line = text[line_start: (line_end if line_end != -1 else len(text))]
         claim_text = _SOURCE_RE.sub("", line).strip(" -\u2022*#>").strip()
-        citations.append(
-            {
-                "claim_text": claim_text,
-                "source_type": id_to_type.get(source_id, "unknown"),
-                "source_id": source_id,
-                "source_date": None,
-                "verified": False,
-            }
-        )
+        citations.append({
+            "claim_text": claim_text,
+            "source_type": id_to_type.get(source_id, "unknown"),
+            "source_id": source_id,
+            "source_date": None,
+            "verified": False,
+        })
     return citations
+
+
+# ---------------------------------------------------------------------------
+# Conditional edge routing
+# ---------------------------------------------------------------------------
+
+
+def _route_after_retrieve(state: SummarizerState) -> str:
+    """Skip to format_output if ALL tools failed (no data at all)."""
+    any_data = (
+        state.get("demographics") is not None
+        or any(bool(state.get(f)) for f in _LIST_FIELDS)
+    )
+    return "structure_data" if any_data else "format_output"
+
+
+def _route_after_verify(state: SummarizerState) -> str:
+    """Retry generation if confidence < 50% and retry budget remains."""
+    vr = state.get("verification_result")
+    retry_count = state.get("retry_count", 0)
+
+    if vr is not None:
+        score = (
+            vr.confidence_score
+            if hasattr(vr, "confidence_score")
+            else vr.get("confidence_score", 1.0)  # type: ignore[union-attr]
+        )
+        if score < 0.50 and retry_count < 1:
+            logger.info(
+                "Confidence %.0f%% < 50%%; routing to regenerate (retry_count=%d)",
+                score * 100,
+                retry_count,
+            )
+            return "generate_summary"
+
+    return "format_output"
 
 
 # ---------------------------------------------------------------------------
@@ -380,167 +356,44 @@ def create_pipeline(
     Build and compile the LangGraph StateGraph for the chart summarizer.
 
     Args:
-        tools: List of FHIRTool instances to use for data retrieval.
-               Defaults to create_mock_tools() when None (no live FHIR required).
-        llm_provider: LLMProvider instance for the summarize node.
-                      Defaults to create_llm_provider() (reads from settings) when None.
+        tools: List of FHIRTool instances.  Defaults to mock tools when None.
+        llm_provider: LLMProvider instance.  Defaults to create_llm_provider() when None.
 
     Returns:
-        A compiled LangGraph runnable that accepts PipelineState as input.
+        Compiled LangGraph runnable accepting SummarizerState as input.
     """
     from chart_summarizer.tools.mock import create_mock_tools
 
-    resolved_tools: list[Any] = tools if tools is not None else create_mock_tools()
-    # Mutable list so the closure can lazily initialise without nonlocal assignment.
-    _llm: list[Any] = [llm_provider]
+    resolved_tools = tools if tools is not None else create_mock_tools()
 
-    # -----------------------------------------------------------------------
-    # Node 1 — Data Retrieval
-    # -----------------------------------------------------------------------
+    retrieve_node = make_retrieve_data_node(resolved_tools)
+    generate_node = make_generate_summary_node(llm_provider)
 
-    async def retrieve_node(state: PipelineState) -> dict[str, Any]:
-        date_range = state.get("date_range_months", settings.SUMMARY_DEFAULT_MONTHS)
-        date_from = (date.today() - timedelta(days=30 * date_range)).isoformat()
+    graph: StateGraph = StateGraph(SummarizerState)
 
-        async def _run(tool: Any) -> tuple[Any, Any]:
-            kwargs: dict[str, Any] = (
-                {}
-                if tool.tool_name in _NO_DATE_FILTER_TOOLS
-                else {"date_from": date_from}
-            )
-            return tool, await tool.execute(state["patient_id"], **kwargs)
+    graph.add_node("retrieve_data", retrieve_node)
+    graph.add_node("structure_data", structure_data_node)
+    graph.add_node("generate_summary", generate_node)
+    graph.add_node("verify_summary", verify_summary_node)
+    graph.add_node("format_output", format_output_node)
 
-        raw_results = await asyncio.gather(
-            *[_run(t) for t in resolved_tools],
-            return_exceptions=True,
-        )
+    graph.add_edge(START, "retrieve_data")
 
-        patient_data: dict[str, Any] = {}
-        retrieval_errors: list[str] = []
+    graph.add_conditional_edges(
+        "retrieve_data",
+        _route_after_retrieve,
+        {"structure_data": "structure_data", "format_output": "format_output"},
+    )
 
-        for item in raw_results:
-            if isinstance(item, Exception):
-                logger.error("Tool raised exception: %s", item)
-                retrieval_errors.append(f"Tool error: {item}")
-                continue
-            tool, result = item
-            section = _TOOL_SECTION_MAP.get(tool.tool_name, tool.tool_name)
-            if result.success:
-                patient_data[section] = result.data
-            else:
-                err = f"{tool.tool_name}: {result.error_message}"
-                logger.warning("Tool returned error: %s", err)
-                retrieval_errors.append(err)
+    graph.add_edge("structure_data", "generate_summary")
+    graph.add_edge("generate_summary", "verify_summary")
 
-        return {
-            "patient_data": patient_data,
-            "retrieval_errors": retrieval_errors,
-            "pipeline_errors": state.get("pipeline_errors", []),
-        }
+    graph.add_conditional_edges(
+        "verify_summary",
+        _route_after_verify,
+        {"generate_summary": "generate_summary", "format_output": "format_output"},
+    )
 
-    # -----------------------------------------------------------------------
-    # Node 2 — Data Structuring
-    # -----------------------------------------------------------------------
-
-    async def structure_node(state: PipelineState) -> dict[str, Any]:
-        raw = state.get("patient_data", {})
-        requested = set(
-            state.get("requested_sections", list(_TOOL_SECTION_MAP.values()))
-        )
-
-        structured: dict[str, Any] = {}
-        for section, data in raw.items():
-            if section not in requested:
-                continue
-            if isinstance(data, list):
-                if date_field := _DATE_SORT_FIELD.get(section):
-                    data = _sort_by_date(data, date_field)
-                if section == "encounters":
-                    data = data[: settings.MAX_ENCOUNTERS_PER_SUMMARY]
-                structured[section] = data
-            else:
-                structured[section] = data
-
-        return {"structured_data": structured}
-
-    # -----------------------------------------------------------------------
-    # Node 3 — LLM Summarisation
-    # -----------------------------------------------------------------------
-
-    async def summarize_node(state: PipelineState) -> dict[str, Any]:
-        if _llm[0] is None:
-            from chart_summarizer.llm.factory import create_llm_provider
-
-            _llm[0] = create_llm_provider()
-        llm = _llm[0]
-
-        structured_data = state.get("structured_data", {})
-        specialty = state.get("specialty", "primary_care")
-        system_prompt = _build_system_prompt(specialty)
-        user_message = _format_patient_data(structured_data)
-
-        try:
-            llm_response = await llm.generate(
-                system_prompt=system_prompt,
-                messages=[{"role": "user", "content": user_message}],
-            )
-        except Exception as exc:
-            logger.error("LLM generation failed: %s", exc)
-            errors = list(state.get("pipeline_errors", []))
-            errors.append(f"summarize_node: {exc}")
-            return {
-                "summary_text": f"[ERROR] Summary generation failed: {exc}",
-                "citations": [],
-                "model_used": "",
-                "input_tokens": 0,
-                "output_tokens": 0,
-                "pipeline_errors": errors,
-            }
-
-        patient_data = state.get("patient_data", {})
-        citations = _extract_citations(llm_response.content, patient_data)
-
-        return {
-            "summary_text": llm_response.content,
-            "citations": citations,
-            "model_used": llm_response.model,
-            "input_tokens": llm_response.input_tokens,
-            "output_tokens": llm_response.output_tokens,
-        }
-
-    # -----------------------------------------------------------------------
-    # Node 4 — Post-Generation Verification
-    # -----------------------------------------------------------------------
-
-    async def verify_node(state: PipelineState) -> dict[str, Any]:
-        from chart_summarizer.verification.verifier import SummaryVerifier
-
-        verifier = SummaryVerifier()
-        result = await verifier.verify(
-            summary_text=state.get("summary_text", ""),
-            patient_data=state.get("patient_data", {}),
-        )
-
-        return {
-            "verification_result": result.model_dump(mode="json"),
-            "confidence_level": result.confidence_level,
-        }
-
-    # -----------------------------------------------------------------------
-    # Graph construction
-    # -----------------------------------------------------------------------
-
-    graph: StateGraph = StateGraph(PipelineState)
-
-    graph.add_node("retrieve", retrieve_node)
-    graph.add_node("structure", structure_node)
-    graph.add_node("summarize", summarize_node)
-    graph.add_node("verify", verify_node)
-
-    graph.add_edge(START, "retrieve")
-    graph.add_edge("retrieve", "structure")
-    graph.add_edge("structure", "summarize")
-    graph.add_edge("summarize", "verify")
-    graph.add_edge("verify", END)
+    graph.add_edge("format_output", END)
 
     return graph.compile()

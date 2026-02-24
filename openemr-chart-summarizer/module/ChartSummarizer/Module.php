@@ -32,7 +32,7 @@ use Symfony\Component\EventDispatcher\EventDispatcherInterface;
  *
  * Registered in OpenEMR's module system. Responsible for:
  * - Declaring module metadata
- * - Registering event listeners (menu injection, hooks)
+ * - Registering event listeners (menu injection)
  * - Loading module-specific autoloading
  */
 class Module
@@ -56,14 +56,9 @@ class Module
      * Bootstrap the module within the OpenEMR application lifecycle.
      *
      * Called by OpenEMR's module loader when the module is enabled.
-     * Register event listeners, menu items, and any startup logic here.
      *
      * @param EventDispatcherInterface $eventDispatcher OpenEMR event bus.
      * @param ModulesClassLoader       $loader          Module class autoloader.
-     *
-     * @TODO Register a listener on MenuEvent to inject the "Chart Summary"
-     *       menu item under Patient → Clinical.
-     * @TODO Register the module's route prefix with OpenEMR's router.
      */
     public function bootstrap(
         EventDispatcherInterface $eventDispatcher,
@@ -75,8 +70,43 @@ class Module
             __DIR__ . '/src/'
         );
 
-        // TODO: Register menu event listener
-        // $eventDispatcher->addListener(MenuEvent::MENU_UPDATE, [$this, 'onMenuUpdate']);
+        // Inject "AI Chart Summary" under Patient menu
+        $eventDispatcher->addListener(
+            MenuEvent::MENU_UPDATE,
+            [$this, 'onMenuUpdate']
+        );
+    }
+
+    /**
+     * Add the "AI Chart Summary" menu item under Patient → Clinical.
+     *
+     * @param MenuEvent $event OpenEMR menu update event.
+     */
+    public function onMenuUpdate(MenuEvent $event): void
+    {
+        $menu = $event->getMenu();
+
+        // Build the menu item definition
+        $menuItem = new \stdClass();
+        $menuItem->requirement = 0;
+        $menuItem->target = 'main';
+        $menuItem->menu_id = 'chart_summarizer';
+        $menuItem->label = xlt('AI Chart Summary');
+        $menuItem->url = '/modules/ChartSummarizer/index?pid=';
+        $menuItem->appendPid = true;
+        $menuItem->icon = 'fas fa-brain';
+        $menuItem->aclSection = 'patients';
+        $menuItem->aclValue = 'docs';
+
+        // Find the "Patient" top-level section and append under it
+        foreach ($menu as $menuSection) {
+            if ($menuSection->menu_id === 'patientMenu') {
+                $menuSection->children[] = $menuItem;
+                break;
+            }
+        }
+
+        $event->setMenu($menu);
     }
 
     /**
@@ -87,13 +117,13 @@ class Module
     public function getModuleInfo(): array
     {
         return [
-            'name'            => self::MODULE_NAME,
-            'display_name'    => self::MODULE_DISPLAY_NAME,
-            'description'     => 'AI-powered patient chart summarization using Claude/GPT. '
-                               . 'Generates clinician-reviewed draft summaries from FHIR data.',
-            'version'         => '0.1.0',
-            'author'          => 'OpenEMR Community',
-            'license'         => 'GPL-3.0',
+            'name'             => self::MODULE_NAME,
+            'display_name'     => self::MODULE_DISPLAY_NAME,
+            'description'      => 'AI-powered patient chart summarization using Claude/GPT. '
+                                . 'Generates clinician-reviewed draft summaries from FHIR data.',
+            'version'          => '0.1.0',
+            'author'           => 'OpenEMR Community',
+            'license'          => 'GPL-3.0',
             'min_oemr_version' => self::MINIMUM_OPENEMR_VERSION,
         ];
     }

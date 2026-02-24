@@ -32,16 +32,13 @@ use OpenEMR\Common\Acl\AclMain;
  * Controller for the Chart Summarizer module UI.
  *
  * Routes:
- *   GET  /modules/ChartSummarizer            → indexAction()     (summary viewer)
- *   POST /modules/ChartSummarizer/summarize  → summarizeAction() (trigger generation)
- *   GET  /modules/ChartSummarizer/settings   → settingsAction()  (admin config)
+ *   GET  /modules/ChartSummarizer              → indexAction()      (summary viewer)
+ *   POST /modules/ChartSummarizer/summarize    → summarizeAction()  (trigger generation)
+ *   POST /modules/ChartSummarizer/feedback     → feedbackAction()   (submit feedback)
+ *   GET  /modules/ChartSummarizer/settings     → settingsAction()   (admin config)
  *
- * Authentication to the Python microservice uses a shared Bearer token read
- * from the CHART_SUMMARIZER_API_KEY environment variable — the same secret
- * configured as AGENT_API_KEY in the Python agent's .env file.
- *
- * ACL checks use OpenEMR's AclMain::aclCheckCore().  A failing ACL check
- * returns a 403 ViewModel/JsonModel without throwing.
+ * All calls to the Python microservice use the versioned /api/v1/ prefix and
+ * forward a Bearer token (CHART_SUMMARIZER_API_KEY) for authentication.
  */
 class SummarizerController extends AbstractActionController
 {
@@ -84,15 +81,15 @@ class SummarizerController extends AbstractActionController
     }
 
     /**
-     * Accept a POST request to generate a chart summary via the Python agent.
+     * Generate a chart summary via the Python agent.
      *
      * Expected POST fields:
      *   patient_id           string  (required) — OpenEMR PID
      *   specialty            string  (optional, default: primary_care)
      *   requested_sections   array   (optional, default: all sections)
      *
-     * Returns a JSON-encoded SummaryResponse from the Python agent, or a JSON
-     * error object with an "error" key and an HTTP "code" on failure.
+     * Returns JSON-encoded SummaryResponse from the Python agent, or an error
+     * object with an "error" key on failure.
      *
      * ACL required: patients / docs.
      *
@@ -119,7 +116,6 @@ class SummarizerController extends AbstractActionController
             return new JsonModel(['error' => 'patient_id is required.', 'code' => 400]);
         }
 
-        // Default to all supported sections when none specified
         /** @var string[]|mixed $rawSections */
         $rawSections = $post['requested_sections'] ?? null;
         $sections    = (is_array($rawSections) && !empty($rawSections))
@@ -137,7 +133,66 @@ class SummarizerController extends AbstractActionController
         ];
 
         try {
-            $response = $this->callMicroservice('/summarize', $payload);
+            $response = $this->callMicroservice('/api/v1/summarize', $payload);
+        } catch (\RuntimeException $e) {
+            $this->getResponse()->setStatusCode(502);
+            return new JsonModel(['error' => $e->getMessage(), 'code' => 502]);
+        }
+
+        return new JsonModel($response);
+    }
+
+    /**
+     * Submit clinician feedback on a generated summary.
+     *
+     * Expected POST fields:
+     *   summary_id  string  (required) — the summary UUID from metadata.request_id
+     *   action      string  (required) — "approved" | "edited" | "rejected"
+     *   edits       string  (optional) — description of edits made (no PHI)
+     *   notes       string  (optional) — free-text notes (no PHI)
+     *
+     * ACL required: patients / docs.
+     *
+     * @return JsonModel
+     */
+    public function feedbackAction(): JsonModel
+    {
+        if (!$this->getRequest()->isPost()) {
+            $this->getResponse()->setStatusCode(405);
+            return new JsonModel(['error' => 'Method not allowed.', 'code' => 405]);
+        }
+
+        if (!$this->checkAcl('patients', 'docs')) {
+            $this->getResponse()->setStatusCode(403);
+            return new JsonModel(['error' => 'Access denied.', 'code' => 403]);
+        }
+
+        $post      = $this->getRequest()->getPost();
+        $summaryId = trim((string) ($post['summary_id'] ?? ''));
+        $action    = trim((string) ($post['action'] ?? ''));
+
+        if ($summaryId === '') {
+            $this->getResponse()->setStatusCode(400);
+            return new JsonModel(['error' => 'summary_id is required.', 'code' => 400]);
+        }
+
+        $validActions = ['approved', 'edited', 'rejected'];
+        if (!in_array($action, $validActions, true)) {
+            $this->getResponse()->setStatusCode(400);
+            return new JsonModel([
+                'error' => 'action must be one of: ' . implode(', ', $validActions),
+                'code'  => 400,
+            ]);
+        }
+
+        $payload = [
+            'action' => $action,
+            'edits'  => trim((string) ($post['edits'] ?? '')),
+            'notes'  => trim((string) ($post['notes'] ?? '')),
+        ];
+
+        try {
+            $response = $this->callMicroservice('/api/v1/summarize/' . $summaryId . '/feedback', $payload);
         } catch (\RuntimeException $e) {
             $this->getResponse()->setStatusCode(502);
             return new JsonModel(['error' => $e->getMessage(), 'code' => 502]);
@@ -184,11 +239,6 @@ class SummarizerController extends AbstractActionController
 
     /**
      * Wrap AclMain::aclCheckCore() and return a plain bool.
-     *
-     * @param string $section ACL section (e.g. 'patients', 'admin').
-     * @param string $value   ACL value   (e.g. 'docs', 'super').
-     *
-     * @return bool True if the current user has the requested permission.
      */
     private function checkAcl(string $section, string $value): bool
     {
@@ -199,10 +249,10 @@ class SummarizerController extends AbstractActionController
      * Forward a JSON request to the Python microservice via cURL.
      *
      * Sends ``Authorization: Bearer <key>`` when CHART_SUMMARIZER_API_KEY is
-     * set in the environment.  The key must match AGENT_API_KEY configured in
-     * the Python agent.
+     * set in the environment. The PHP module's session token is forwarded as-is
+     * so the Python agent can validate it via OpenEMR's OAuth2 introspection.
      *
-     * @param string               $path    API path, e.g. '/summarize'.
+     * @param string               $path    API path, e.g. '/api/v1/summarize'.
      * @param array<string, mixed> $payload JSON-serialisable request body.
      *
      * @return array<string, mixed> Decoded JSON response body.
@@ -240,7 +290,6 @@ class SummarizerController extends AbstractActionController
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_TIMEOUT        => $timeout,
             CURLOPT_CONNECTTIMEOUT => 10,
-            // Do not fail on HTTP 4xx/5xx — we inspect the code ourselves
             CURLOPT_FAILONERROR    => false,
         ]);
 
@@ -262,6 +311,14 @@ class SummarizerController extends AbstractActionController
             );
         }
 
+        if ($httpCode === 429) {
+            throw new \RuntimeException('Rate limit exceeded on the chart summarizer service.');
+        }
+
+        if ($httpCode === 504) {
+            throw new \RuntimeException('Chart summarizer service timed out generating the summary.');
+        }
+
         if ($httpCode >= 400) {
             throw new \RuntimeException(
                 sprintf('Microservice returned HTTP %d error.', $httpCode)
@@ -279,9 +336,6 @@ class SummarizerController extends AbstractActionController
 
     /**
      * Build the module configuration from defaults, overridden by OpenEMR globals.
-     *
-     * OpenEMR stores module settings in the globals table, accessible at runtime
-     * via $GLOBALS['chart_summarizer_<key>'].
      *
      * @return array<string, mixed>
      */
@@ -308,16 +362,13 @@ class SummarizerController extends AbstractActionController
     /**
      * Persist module settings to the OpenEMR globals table.
      *
-     * Uses OpenEMR's built-in sqlQuery / sqlStatement helpers which are always
-     * available in the global scope within an OpenEMR request.
-     *
      * @param array<string, mixed> $settings Key-value pairs to persist.
      */
     private function saveModuleSettings(array $settings): void
     {
         foreach ($settings as $key => $value) {
-            $globalKey    = 'chart_summarizer_' . $key;
-            $storedValue  = is_bool($value) ? (int) $value : $value;
+            $globalKey   = 'chart_summarizer_' . $key;
+            $storedValue = is_bool($value) ? (int) $value : $value;
 
             $existing = sqlQuery(
                 'SELECT gl_value FROM globals WHERE gl_name = ?',
@@ -336,15 +387,12 @@ class SummarizerController extends AbstractActionController
                 );
             }
 
-            // Keep in-memory globals in sync for the current request
             $GLOBALS[$globalKey] = $value;
         }
     }
 
     /**
      * Return a 403 ViewModel for access-denied scenarios.
-     *
-     * @return ViewModel
      */
     private function accessDenied(): ViewModel
     {

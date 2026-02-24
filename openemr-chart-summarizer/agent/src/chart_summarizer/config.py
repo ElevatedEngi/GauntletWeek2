@@ -98,6 +98,39 @@ class Settings(BaseSettings):
         description="Maximum number of lab results fetched per summary request.",
     )
 
+    # --- Database ---
+    DATABASE_URL: str = Field(
+        default="sqlite+aiosqlite:///./chart_summarizer.db",
+        description=(
+            "Async SQLAlchemy database URL. "
+            "sqlite+aiosqlite for dev, postgresql+asyncpg://user:pass@host/db for prod."
+        ),
+    )
+    SUMMARY_CACHE_TTL_HOURS: int = Field(
+        default=24,
+        ge=1,
+        le=720,
+        description="Hours to keep generated summaries in the cache before expiry.",
+    )
+
+    # --- Rate Limiting ---
+    RATE_LIMIT_PER_HOUR: int = Field(
+        default=20,
+        ge=1,
+        le=1000,
+        description="Maximum summary requests per user per hour (sliding window).",
+    )
+
+    # --- OpenEMR OAuth2 Introspection ---
+    OPENEMR_OAUTH2_INTROSPECT_URL: str = Field(
+        default="",
+        description=(
+            "Full URL for OpenEMR's OAuth2 token introspection endpoint. "
+            "E.g. http://localhost:8080/oauth2/default/introspect. "
+            "When empty, only shared-key auth is used."
+        ),
+    )
+
     # --- Agent API Authentication ---
     AGENT_API_KEY: SecretStr = Field(
         default=SecretStr(""),

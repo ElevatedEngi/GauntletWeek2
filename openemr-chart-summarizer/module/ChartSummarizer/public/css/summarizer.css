@@ -8,35 +8,59 @@
  * the Free Software Foundation, either version 3 of the License, or
  * (at your option) any later version.
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program. If not, see <https://www.gnu.org/licenses/>.
+ * Complements OpenEMR's Bootstrap 5 theme with minimal custom overrides.
+ * All colours follow the spec:
+ *   GREEN  → #2E7D32 (high confidence)
+ *   YELLOW → #F9A825 (moderate confidence)
+ *   RED    → #C62828 (low confidence)
  */
 
 /* ---------------------------------------------------------------------------
- * Confidence level banners
+ * Confidence level banners (text uses spec colours for accessibility)
  * --------------------------------------------------------------------------- */
 
 .confidence-green {
-    background-color: #d1e7dd;
-    border-color: #badbcc;
-    color: #0f5132;
+    background-color: #e8f5e9;
+    border-color: #a5d6a7;
+    color: #2E7D32;
 }
 
 .confidence-yellow {
-    background-color: #fff3cd;
-    border-color: #ffecb5;
-    color: #664d03;
+    background-color: #fff8e1;
+    border-color: #ffe082;
+    color: #795400; /* Darker for WCAG contrast on yellow background */
 }
 
 .confidence-red {
-    background-color: #f8d7da;
-    border-color: #f5c2c7;
-    color: #842029;
+    background-color: #ffebee;
+    border-color: #ef9a9a;
+    color: #C62828;
+}
+
+/* Confidence badge icons shown inline in the banner */
+.confidence-green strong::before  { content: '● '; color: #2E7D32; }
+.confidence-yellow strong::before { content: '● '; color: #F9A825; }
+.confidence-red strong::before    { content: '● '; color: #C62828; }
+
+/* ---------------------------------------------------------------------------
+ * AI safety banner
+ * --------------------------------------------------------------------------- */
+
+.summarizer-safety-banner {
+    border-left: 4px solid #F9A825;
+    background-color: #fff8e1;
+}
+
+/* ---------------------------------------------------------------------------
+ * Draft watermark badge
+ * --------------------------------------------------------------------------- */
+
+.draft-badge {
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    vertical-align: middle;
 }
 
 /* ---------------------------------------------------------------------------
@@ -45,22 +69,96 @@
 
 #summary-content {
     font-size: 0.95rem;
-    line-height: 1.6;
+    line-height: 1.65;
 }
 
 #summary-content h2,
 #summary-content h3 {
     margin-top: 1.25rem;
     margin-bottom: 0.5rem;
+    font-size: 1.05rem;
+    font-weight: 600;
     color: #2c3e50;
+    border-bottom: 1px solid #e9ecef;
+    padding-bottom: 0.25rem;
 }
 
-#summary-content .citation {
-    font-size: 0.8rem;
-    color: #6c757d;
+#summary-content h4 {
+    margin-top: 1rem;
+    margin-bottom: 0.4rem;
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: #495057;
+}
+
+#summary-content ul,
+#summary-content ol {
+    padding-left: 1.5rem;
+}
+
+#summary-content li {
+    margin-bottom: 0.2rem;
+}
+
+#summary-content code {
+    font-size: 0.82rem;
     background-color: #f8f9fa;
+    padding: 0.1rem 0.25rem;
+    border-radius: 3px;
+    color: #495057;
+}
+
+.summarizer-plaintext {
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    font-family: inherit;
+    font-size: 0.95rem;
+    line-height: 1.65;
+    border: none;
+    padding: 0;
+    background: transparent;
+}
+
+/* ---------------------------------------------------------------------------
+ * Citation panel
+ * --------------------------------------------------------------------------- */
+
+.citation-item {
+    transition: background-color 0.15s ease;
+}
+
+.citation-item:hover {
+    background-color: #f8f9fa;
+}
+
+.citation-claim {
+    font-size: 0.85rem;
+    color: #343a40;
+    line-height: 1.4;
+}
+
+.citation-source {
+    font-size: 0.8rem;
+}
+
+.citation-id {
+    font-size: 0.75rem;
+    background-color: #e9ecef;
     padding: 0.1rem 0.3rem;
     border-radius: 3px;
+    color: #495057;
+    word-break: break-all;
+}
+
+/* Highlight [Source: ...] tags rendered inside the summary text */
+#summary-content .citation-tag {
+    font-size: 0.78rem;
+    color: #6c757d;
+    background-color: #f1f3f5;
+    padding: 0.05rem 0.25rem;
+    border-radius: 3px;
+    border: 1px solid #dee2e6;
+    margin-left: 0.15rem;
 }
 
 /* ---------------------------------------------------------------------------
@@ -69,18 +167,26 @@
 
 #summary-loading {
     min-height: 200px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
 }
 
 /* ---------------------------------------------------------------------------
- * Draft watermark
+ * Responsive — tablet adjustments
  * --------------------------------------------------------------------------- */
 
-.draft-badge {
-    font-size: 0.7rem;
-    font-weight: 700;
-    letter-spacing: 0.05em;
-    text-transform: uppercase;
+@media (max-width: 767px) {
+    #citations-panel {
+        margin-top: 1rem;
+    }
+
+    #summary-content {
+        font-size: 0.9rem;
+    }
+
+    .d-flex.gap-2 {
+        flex-direction: column;
+    }
+
+    .d-flex.gap-2 .btn {
+        width: 100%;
+    }
 }

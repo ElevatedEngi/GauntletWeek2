@@ -14,13 +14,14 @@
 # along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 """
-Unit tests for the verify_api_key FastAPI dependency and the /summarize route
-authentication integration.
+Unit tests for the verify_api_key / verify_token FastAPI dependencies.
 
 Test strategy:
-  - Patch settings.AGENT_API_KEY so tests are fully isolated from .env files.
+  - Patch settings to be fully isolated from .env files.
   - Use FastAPI's TestClient for end-to-end route-level auth tests.
   - Directly call verify_api_key() for unit tests of the dependency itself.
+
+All route paths use the /api/v1 prefix (configured in main.py).
 """
 
 from unittest.mock import patch
@@ -30,7 +31,7 @@ from fastapi import HTTPException
 from fastapi.testclient import TestClient
 from pydantic import SecretStr
 
-from chart_summarizer.api.auth import verify_api_key
+from chart_summarizer.api.auth import _cache, verify_api_key
 from chart_summarizer.main import create_app
 
 
@@ -48,7 +49,7 @@ def _make_request(headers: dict) -> object:
     scope: Scope = {
         "type": "http",
         "method": "POST",
-        "path": "/summarize",
+        "path": "/api/v1/summarize",
         "query_string": b"",
         "headers": Headers(headers=headers).raw,
     }
@@ -56,10 +57,11 @@ def _make_request(headers: dict) -> object:
 
 
 def _patch_key(value: str):
-    """Context manager: patch AGENT_API_KEY for a single test."""
+    """Context manager: patch auth settings for a single test."""
     return patch(
         "chart_summarizer.api.auth.settings",
-        **{"AGENT_API_KEY": SecretStr(value)},
+        AGENT_API_KEY=SecretStr(value),
+        OPENEMR_OAUTH2_INTROSPECT_URL="",
     )
 
 
@@ -69,8 +71,12 @@ def _patch_key(value: str):
 
 
 class TestVerifyApiKeyDependency:
+    def setup_method(self):
+        # Clear the token cache before each test for isolation.
+        _cache.clear()
+
     async def test_no_key_configured_skips_auth(self) -> None:
-        """When AGENT_API_KEY is empty, any request (even without a header) passes."""
+        """When AGENT_API_KEY is empty and no introspect URL, any request passes."""
         with _patch_key(""):
             request = _make_request({})
             await verify_api_key(request)  # must not raise
@@ -137,21 +143,21 @@ class TestVerifyApiKeyDependency:
 
 class TestSummarizeRouteAuth:
     """
-    Tests that /summarize returns 401 when auth is enforced via the route
-    dependency, and 200 when a valid key is provided (auth disabled).
+    Tests that /api/v1/summarize returns 401 when auth is enforced, and
+    200/500 (not 401) when a valid key is provided or auth is disabled.
     """
 
     def test_no_configured_key_allows_request(self) -> None:
-        """With AGENT_API_KEY empty, /summarize is reachable without a header."""
+        """With AGENT_API_KEY empty, /api/v1/summarize is reachable without a header."""
         app = create_app()
         with patch(
             "chart_summarizer.api.auth.settings",
             AGENT_API_KEY=SecretStr(""),
+            OPENEMR_OAUTH2_INTROSPECT_URL="",
         ):
             client = TestClient(app, raise_server_exceptions=False)
-            # A minimal valid SummaryRequest body
             resp = client.post(
-                "/summarize",
+                "/api/v1/summarize",
                 json={
                     "patient_id": "TEST-001",
                     "specialty": "primary_care",
@@ -166,10 +172,11 @@ class TestSummarizeRouteAuth:
         with patch(
             "chart_summarizer.api.auth.settings",
             AGENT_API_KEY=SecretStr("super-secret"),
+            OPENEMR_OAUTH2_INTROSPECT_URL="",
         ):
             client = TestClient(app, raise_server_exceptions=False)
             resp = client.post(
-                "/summarize",
+                "/api/v1/summarize",
                 json={"patient_id": "TEST-001", "specialty": "primary_care",
                       "requested_sections": ["demographics"]},
             )
@@ -180,10 +187,11 @@ class TestSummarizeRouteAuth:
         with patch(
             "chart_summarizer.api.auth.settings",
             AGENT_API_KEY=SecretStr("super-secret"),
+            OPENEMR_OAUTH2_INTROSPECT_URL="",
         ):
             client = TestClient(app, raise_server_exceptions=False)
             resp = client.post(
-                "/summarize",
+                "/api/v1/summarize",
                 headers={"Authorization": "Bearer wrong-token"},
                 json={"patient_id": "TEST-001", "specialty": "primary_care",
                       "requested_sections": ["demographics"]},
@@ -196,35 +204,51 @@ class TestSummarizeRouteAuth:
         with patch(
             "chart_summarizer.api.auth.settings",
             AGENT_API_KEY=SecretStr(secret),
+            OPENEMR_OAUTH2_INTROSPECT_URL="",
         ):
             client = TestClient(app, raise_server_exceptions=False)
             resp = client.post(
-                "/summarize",
+                "/api/v1/summarize",
                 headers={"Authorization": f"Bearer {secret}"},
                 json={"patient_id": "TEST-001", "specialty": "primary_care",
                       "requested_sections": ["demographics"]},
             )
-        # Auth passed — not a 401 (pipeline may return 200 or 500)
+        # Auth passed — not a 401
         assert resp.status_code != 401
 
     def test_health_endpoint_never_requires_auth(self) -> None:
-        """GET /health must be reachable without any Authorization header."""
+        """GET /api/v1/health must be reachable without any Authorization header."""
         app = create_app()
         with patch(
             "chart_summarizer.api.auth.settings",
             AGENT_API_KEY=SecretStr("super-secret"),
+            OPENEMR_OAUTH2_INTROSPECT_URL="",
         ):
             client = TestClient(app, raise_server_exceptions=False)
-            resp = client.get("/health")
+            resp = client.get("/api/v1/health")
         assert resp.status_code == 200
 
-    def test_config_endpoint_never_requires_auth(self) -> None:
-        """GET /config must be reachable without any Authorization header."""
+    def test_config_endpoint_requires_auth_when_key_configured(self) -> None:
+        """GET /api/v1/config requires auth (unlike the old unauthenticated /config)."""
         app = create_app()
         with patch(
             "chart_summarizer.api.auth.settings",
             AGENT_API_KEY=SecretStr("super-secret"),
+            OPENEMR_OAUTH2_INTROSPECT_URL="",
         ):
             client = TestClient(app, raise_server_exceptions=False)
-            resp = client.get("/config")
+            resp = client.get("/api/v1/config")
+        assert resp.status_code == 401
+
+    def test_config_endpoint_accessible_with_valid_token(self) -> None:
+        """GET /api/v1/config succeeds with a correct Bearer token."""
+        secret = "super-secret"
+        app = create_app()
+        with patch(
+            "chart_summarizer.api.auth.settings",
+            AGENT_API_KEY=SecretStr(secret),
+            OPENEMR_OAUTH2_INTROSPECT_URL="",
+        ):
+            client = TestClient(app, raise_server_exceptions=False)
+            resp = client.get("/api/v1/config", headers={"Authorization": f"Bearer {secret}"})
         assert resp.status_code == 200

@@ -18,13 +18,21 @@ FastAPI middleware: request logging and HIPAA audit trail.
 
 Middleware stack (applied in order, innermost first):
   1. RequestLoggingMiddleware — logs request/response metadata (no PHI in URLs).
-  2. AuditMiddleware           — writes to the HIPAA audit log for /summarize calls.
+  2. AuditMiddleware           — writes HTTP-level audit for patient-data paths.
 
-Authentication is handled at the route level via FastAPI dependencies.
+Patient-level detail (patient_id, LLM model, token counts) is written by the
+route handlers via ``write_audit_record()``, since the request body is only
+available after parsing.
+
+HIPAA rules enforced here:
+  - URL paths are logged but must never contain PHI.
+  - Patient IDs are only accepted in request bodies (POST), never in URLs.
+  - Audit log entries are append-only (INSERT only — no UPDATE/DELETE).
 """
 
 import time
 import uuid
+from datetime import datetime
 from typing import Callable
 
 from fastapi import Request, Response
@@ -35,6 +43,9 @@ from chart_summarizer.config import settings
 from chart_summarizer.utils.logging import get_logger
 
 logger = get_logger(__name__)
+
+# Paths that involve patient data and must generate audit records.
+_AUDITED_BASE_PATHS = ("/summarize",)
 
 
 class RequestLoggingMiddleware(BaseHTTPMiddleware):
@@ -47,16 +58,15 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
     """
 
     def __init__(self, app: ASGIApp) -> None:
-        """Initialise the middleware with the ASGI app."""
         super().__init__(app)
 
     async def dispatch(self, request: Request, call_next: Callable) -> Response:
-        """Process the request, log metadata, and forward to the next handler."""
         request_id = str(uuid.uuid4())
         start = time.monotonic()
 
-        # Attach request_id so downstream handlers can include it in logs
         request.state.request_id = request_id
+        if not hasattr(request.state, "user"):
+            request.state.user = None
 
         logger.info(
             "REQUEST | id=%s method=%s path=%s",
@@ -75,33 +85,37 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
             latency_ms,
         )
 
-        # Attach request ID to response headers for tracing
         response.headers["X-Request-ID"] = request_id
         return response
 
 
 class AuditMiddleware(BaseHTTPMiddleware):
     """
-    Write HIPAA audit log entries for all /summarize requests.
+    Write HTTP-level audit log entries for all paths that involve patient data.
 
-    Captures: request_id, timestamp, HTTP status, and latency.
-    The route handler is responsible for logging patient_pid and model details,
-    since those are only available after the request body is parsed.
+    Records request_id, user_id, HTTP path, status code, and latency.
+    Patient-level detail (patient_id, LLM model, token counts) is written by
+    the route handler via ``write_audit_record()``.
 
-    TODO:
-        - Optionally forward audit events to CloudWatch Logs or an audit database.
+    When AUDIT_LOG_ENABLED is False (e.g. in tests), the middleware is a no-op.
     """
 
     def __init__(self, app: ASGIApp) -> None:
-        """Initialise the audit middleware."""
         super().__init__(app)
 
     async def dispatch(self, request: Request, call_next: Callable) -> Response:
-        """Pass through non-summarize requests; write audit for /summarize."""
         if not settings.AUDIT_LOG_ENABLED:
             return await call_next(request)
 
-        if request.url.path != "/summarize":
+        # Strip the /api/v1 prefix for matching.
+        path = request.url.path
+        base_path = path[len("/api/v1"):] if path.startswith("/api/v1") else path
+
+        audited = any(
+            base_path == p or base_path.startswith(p + "/")
+            for p in _AUDITED_BASE_PATHS
+        )
+        if not audited:
             return await call_next(request)
 
         start = time.monotonic()
@@ -109,12 +123,90 @@ class AuditMiddleware(BaseHTTPMiddleware):
         latency_ms = int((time.monotonic() - start) * 1000)
 
         request_id = getattr(request.state, "request_id", "unknown")
+        user = getattr(request.state, "user", None)
+        user_id = user.user_id if user else "unauthenticated"
+
         logger.info(
-            "AUDIT | request_id=%s path=%s status=%d latency_ms=%d",
+            "AUDIT | request_id=%s user_id=%s path=%s status=%d latency_ms=%d",
             request_id,
-            request.url.path,
+            user_id,
+            path,
             response.status_code,
             latency_ms,
         )
 
         return response
+
+
+async def write_audit_record(
+    db,
+    *,
+    request_id: str,
+    user_id: str,
+    patient_id: str,
+    action: str,
+    outcome: str,
+    response_time_ms: int,
+    llm_model: str | None = None,
+    token_count: int = 0,
+    cost_estimate: float | None = None,
+) -> None:
+    """
+    Write a complete HIPAA audit record to the database.
+
+    Must be called from the route handler (where patient_id is available after
+    body parsing). Performs an INSERT only — never UPDATE or DELETE.
+
+    HIPAA compliance:
+      - ``patient_id`` stores the OpenEMR PID only — NOT a patient name/DOB.
+      - This function must never be passed PHI (names, DOBs, SSNs, etc.).
+      - Audit failures are logged but never raise — they must not break
+        clinical workflows.
+
+    Args:
+        db:               Active async SQLAlchemy session.
+        request_id:       UUID from ``request.state.request_id``.
+        user_id:          Authenticated user ID from the OAuth2 token.
+        patient_id:       OpenEMR patient PID (integer-as-string).
+        action:           ``summarize`` | ``view`` | ``feedback``.
+        outcome:          ``success`` | ``partial`` | ``failure`` | ``rate_limited``.
+        response_time_ms: End-to-end request latency in milliseconds.
+        llm_model:        LLM model identifier used for this request.
+        token_count:      Total tokens consumed (input + output).
+        cost_estimate:    Estimated USD cost, if calculable.
+    """
+    from sqlalchemy import text
+
+    try:
+        await db.execute(
+            text(
+                """
+                INSERT INTO audit_log
+                    (timestamp, request_id, user_id, patient_id, action, outcome,
+                     response_time_ms, llm_model, token_count, cost_estimate)
+                VALUES
+                    (:ts, :rid, :uid, :pid, :action, :outcome,
+                     :rt, :model, :tokens, :cost)
+                """
+            ),
+            {
+                "ts": datetime.utcnow(),
+                "rid": request_id,
+                "uid": user_id,
+                "pid": patient_id,
+                "action": action,
+                "outcome": outcome,
+                "rt": response_time_ms,
+                "model": llm_model,
+                "tokens": token_count,
+                "cost": cost_estimate,
+            },
+        )
+        await db.commit()
+    except Exception as exc:
+        # Audit failures must never interrupt the clinical workflow.
+        logger.error(
+            "AUDIT_WRITE_FAILED | request_id=%s error=%s",
+            request_id,
+            type(exc).__name__,
+        )

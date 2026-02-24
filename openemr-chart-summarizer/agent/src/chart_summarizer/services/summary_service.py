@@ -17,18 +17,18 @@
 SummaryService — high-level orchestrator for the chart summary pipeline.
 
 This service is the single entry point for the FastAPI layer.
-It translates a SummaryRequest into a PipelineState, invokes the LangGraph
-pipeline, and maps the result back to a SummaryResponse.
+It validates a SummaryRequest, invokes the LangGraph pipeline, and returns
+the assembled SummaryResponse from format_output_node.
 """
 
 import time
 import uuid
-from typing import Any
+from typing import Any, Optional
 
 from chart_summarizer.config import settings
-from chart_summarizer.graph.pipeline import PipelineState, create_pipeline
+from chart_summarizer.graph.pipeline import create_pipeline
+from chart_summarizer.graph.state import SummarizerState
 from chart_summarizer.models.summary import (
-    Citation,
     SummaryMetadata,
     SummaryRequest,
     SummaryResponse,
@@ -45,13 +45,13 @@ class SummaryService:
 
     Responsibilities:
     - Validate and enrich the incoming SummaryRequest.
-    - Prepare the initial PipelineState.
+    - Build the initial SummarizerState.
     - Invoke the compiled LangGraph pipeline.
-    - Map pipeline outputs to a SummaryResponse.
-    - Log the audit event (who, when, which patient, which model).
+    - Return the SummaryResponse assembled by format_output_node.
+    - Write a HIPAA-compliant audit log entry.
     """
 
-    def __init__(self, pipeline: Any = None) -> None:
+    def __init__(self, pipeline: Optional[Any] = None) -> None:
         """
         Compile the LangGraph pipeline once at service startup.
 
@@ -66,11 +66,11 @@ class SummaryService:
         Generate a patient chart summary for the given request.
 
         Steps:
-        1. Resolves the date range (defaults to SUMMARY_DEFAULT_MONTHS if omitted).
-        2. Builds the initial PipelineState.
-        3. Invokes the LangGraph pipeline asynchronously.
-        4. Converts pipeline outputs into a SummaryResponse.
-        5. Writes to the HIPAA audit log (always, even on failure).
+        1. Resolve date range (explicit DateRange or SUMMARY_DEFAULT_MONTHS).
+        2. Build initial SummarizerState.
+        3. Invoke the LangGraph pipeline asynchronously.
+        4. Return the SummaryResponse from format_output_node.
+        5. Write HIPAA audit log (always, even on failure).
 
         Args:
             request: Validated SummaryRequest from the API layer.
@@ -88,17 +88,20 @@ class SummaryService:
         model_used = settings.LLM_MODEL
 
         try:
-            initial_state = self._build_initial_state(request)
-            final_state = await self._pipeline.ainvoke(initial_state)
+            initial_state = self._build_initial_state(request, request_id)
+            final_state: SummarizerState = await self._pipeline.ainvoke(initial_state)
 
-            model_used = final_state.get("model_used") or settings.LLM_MODEL
+            final_summary: Optional[SummaryResponse] = final_state.get("final_summary")
 
-            if final_state.get("summary_text", "").startswith("[ERROR]"):
-                audit_status = "failed"
-            elif final_state.get("retrieval_errors"):
-                audit_status = "partial"
+            if final_summary is not None:
+                model_used = final_summary.metadata.model_used or settings.LLM_MODEL
+                audit_status = final_summary.status
+                return final_summary
 
-            return self._map_to_response(
+            # Fallback if format_output_node produced nothing (catastrophic failure)
+            logger.error("format_output_node produced no final_summary; building fallback")
+            audit_status = "failed"
+            return self._build_fallback_response(
                 final_state=final_state,
                 request_id=request_id,
                 start_time=start_time,
@@ -121,13 +124,14 @@ class SummaryService:
                 latency_ms=latency_ms,
             )
 
-    def _build_initial_state(self, request: SummaryRequest) -> PipelineState:
-        """
-        Translate a SummaryRequest into the initial LangGraph PipelineState.
+    # ------------------------------------------------------------------
+    # Private helpers
+    # ------------------------------------------------------------------
 
-        Computes date_range_months from the explicit DateRange if provided,
-        otherwise falls back to SUMMARY_DEFAULT_MONTHS from config.
-        """
+    def _build_initial_state(
+        self, request: SummaryRequest, request_id: str
+    ) -> SummarizerState:
+        """Translate a SummaryRequest into the initial SummarizerState."""
         if request.date_range:
             delta = request.date_range.end - request.date_range.start
             date_range_months = max(1, int(delta.days / 30))
@@ -135,26 +139,37 @@ class SummaryService:
             date_range_months = settings.SUMMARY_DEFAULT_MONTHS
 
         return {  # type: ignore[return-value]
+            # Input
             "patient_id": request.patient_id,
             "specialty": request.specialty,
             "date_range_months": date_range_months,
-            "requested_sections": request.requested_sections,
-            "requesting_provider_id": request.requesting_provider_id,
-            # Pre-populate optional output keys so LangGraph never sees missing keys.
-            "patient_data": {},
-            "retrieval_errors": [],
-            "structured_data": {},
-            "summary_text": "",
-            "citations": [],
-            "model_used": "",
-            "input_tokens": 0,
-            "output_tokens": 0,
-            "verification_result": {},
-            "confidence_level": "RED",
-            "pipeline_errors": [],
+            "requested_sections": request.requested_sections or None,
+            # Data (empty until retrieve_data_node runs)
+            "demographics": None,
+            "conditions": [],
+            "medications": [],
+            "allergies": [],
+            "lab_results": [],
+            "vitals": [],
+            "encounters": [],
+            "immunizations": [],
+            "procedures": [],
+            # Processing
+            "structured_context": "",
+            "raw_summary": "",
+            "verification_result": None,
+            # Control
+            "retry_count": 0,
+            # Output
+            "final_summary": None,
+            "errors": [],
+            "metadata": {
+                "request_id": request_id,
+                "requesting_provider_id": request.requesting_provider_id,
+            },
         }
 
-    def _map_to_response(
+    def _build_fallback_response(
         self,
         final_state: Any,
         request_id: str,
@@ -162,89 +177,57 @@ class SummaryService:
         patient_id: str,
         specialty: str,
     ) -> SummaryResponse:
-        """
-        Map the final LangGraph pipeline state to a SummaryResponse.
-
-        Determines summary status (complete / partial / failed) from
-        pipeline error flags and retrieval errors.
-        """
+        """Build a minimal SummaryResponse on catastrophic pipeline failure."""
         latency_ms = int((time.time() - start_time) * 1000)
-
-        summary_text: str = final_state.get("summary_text", "")
-        retrieval_errors: list[str] = final_state.get("retrieval_errors", [])
-        pipeline_errors: list[str] = final_state.get("pipeline_errors", [])
-
-        if summary_text.startswith("[ERROR]"):
-            response_status = "failed"
-        elif retrieval_errors or pipeline_errors:
-            response_status = "partial"
-        else:
-            response_status = "complete"
-
-        model_used: str = final_state.get("model_used") or settings.LLM_MODEL
-
+        errors: list[str] = final_state.get("errors") or []
         metadata = SummaryMetadata(
             request_id=request_id,
             patient_id=patient_id,
-            model_used=model_used,
+            model_used=settings.LLM_MODEL,
             provider=settings.LLM_PROVIDER,
-            input_tokens=final_state.get("input_tokens", 0),
-            output_tokens=final_state.get("output_tokens", 0),
+            input_tokens=0,
+            output_tokens=0,
             latency_ms=latency_ms,
-            data_sections_retrieved=list(final_state.get("patient_data", {}).keys()),
+            data_sections_retrieved=[],
             specialty_context=specialty,
         )
-
-        # Re-hydrate VerificationResult from the serialised dict in state.
-        vr_dict: dict[str, Any] = final_state.get("verification_result") or {}
-        if vr_dict:
-            verification_result = VerificationResult.model_validate(vr_dict)
-        else:
-            verification_result = VerificationResult(
-                verified_claims=[],
-                unverified_claims=[],
-                confidence_score=0.0,
-                confidence_level="RED",
-                flags=pipeline_errors or ["Pipeline did not complete verification."],
-            )
-
-        citations = [
-            Citation.model_validate(c)
-            for c in (final_state.get("citations") or [])
-        ]
-
-        confidence_level: str = final_state.get("confidence_level") or "RED"
-
+        vr = VerificationResult(
+            verified_claims=[],
+            unverified_claims=[],
+            confidence_score=0.0,
+            confidence_level="RED",
+            flags=errors or ["Pipeline did not produce a summary."],
+        )
         return SummaryResponse(
-            summary_text=summary_text,
-            citations=citations,
-            confidence_level=confidence_level,  # type: ignore[arg-type]
+            summary_text="[ERROR] Summary generation failed. See errors for details.",
+            citations=[],
+            confidence_level="RED",
             metadata=metadata,
-            verification_result=verification_result,
-            status=response_status,  # type: ignore[arg-type]
+            verification_result=vr,
+            status="failed",
         )
 
     def _write_audit_log(
         self,
         request_id: str,
         patient_id: str,
-        provider_id: str | None,
+        provider_id: Optional[str],
         model_used: str,
         status: str,
         latency_ms: int,
     ) -> None:
         """
-        Write a HIPAA-compliant audit log entry for this summary request.
+        Write a HIPAA-compliant audit log entry.
 
-        Logged fields: request_id, timestamp, provider_id, patient_id (PID only),
-        model_used, latency_ms, status.
-
-        Never log: patient name, DOB, SSN, or any PHI beyond the PID.
+        Logged: request_id, timestamp, provider_id, patient_id (PID only),
+                model_used, latency_ms, status.
+        Never logged: patient name, DOB, SSN, or any PHI beyond the PID.
         """
         if not settings.AUDIT_LOG_ENABLED:
             return
         logger.info(
-            "AUDIT | request_id=%s patient_pid=%s provider=%s model=%s status=%s latency_ms=%d",
+            "AUDIT | request_id=%s patient_pid=%s provider=%s model=%s "
+            "status=%s latency_ms=%d",
             request_id,
             patient_id,
             provider_id or "unknown",

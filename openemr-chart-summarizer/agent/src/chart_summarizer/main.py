@@ -19,8 +19,8 @@ FastAPI application entry point.
 Creates and configures the FastAPI app instance with:
   - CORS middleware (allows requests from OpenEMR's origin)
   - Request logging and HIPAA audit middleware
-  - API routes (/health, /config, /summarize)
-  - OpenAPI documentation at /docs (disable in production if needed)
+  - API routes mounted under /api/v1
+  - Database initialisation on startup (audit log + summary cache tables)
 """
 
 from contextlib import asynccontextmanager
@@ -32,6 +32,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from chart_summarizer.api.middleware import AuditMiddleware, RequestLoggingMiddleware
 from chart_summarizer.api.routes import router
 from chart_summarizer.config import settings
+from chart_summarizer.db.engine import init_db
 from chart_summarizer.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -47,24 +48,26 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """
     Application lifespan handler.
 
-    Startup: validate configuration, warm up connections.
+    Startup: initialise the database, validate configuration.
     Shutdown: flush buffers, close connections.
     """
-    # --- Startup ---
     logger.info(
         "Chart Summarizer Agent starting | provider=%s model=%s hipaa_mode=%s",
         settings.LLM_PROVIDER,
         settings.LLM_MODEL,
         settings.HIPAA_MODE,
     )
-    # TODO: Validate LLM API key connectivity on startup
-    # TODO: Verify OpenEMR FHIR endpoint is reachable
+
+    # Create audit_log and summary_cache tables if they do not exist.
+    try:
+        await init_db()
+    except Exception as exc:
+        logger.error("Database initialisation failed: %s", type(exc).__name__)
+        # Non-fatal — the app starts but audit logging may not work.
 
     yield
 
-    # --- Shutdown ---
     logger.info("Chart Summarizer Agent shutting down.")
-    # TODO: Close httpx client pool, flush audit log buffers
 
 
 # ---------------------------------------------------------------------------
@@ -87,9 +90,11 @@ def create_app() -> FastAPI:
             "All summaries are DRAFTS requiring clinician review."
         ),
         version="0.1.0",
-        license_info={"name": "GNU General Public License v3.0", "url": "https://www.gnu.org/licenses/gpl-3.0.html"},
+        license_info={
+            "name": "GNU General Public License v3.0",
+            "url": "https://www.gnu.org/licenses/gpl-3.0.html",
+        },
         lifespan=lifespan,
-        # Disable docs in production by setting docs_url=None, redoc_url=None
         docs_url="/docs",
         redoc_url="/redoc",
     )
@@ -116,9 +121,9 @@ def create_app() -> FastAPI:
     app.add_middleware(RequestLoggingMiddleware)
 
     # ------------------------------------------------------------------
-    # Routes
+    # Routes — all mounted under /api/v1
     # ------------------------------------------------------------------
-    app.include_router(router)
+    app.include_router(router, prefix="/api/v1")
 
     return app
 

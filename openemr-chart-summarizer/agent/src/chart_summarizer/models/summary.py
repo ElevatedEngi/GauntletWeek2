@@ -148,6 +148,13 @@ class SummaryResponse(BaseModel):
     summary_text: str = Field(
         description="The AI-generated clinical summary in Markdown format."
     )
+    html_summary: Optional[str] = Field(
+        default=None,
+        description=(
+            "HTML-formatted version of the summary for embedding in the OpenEMR UI. "
+            "Includes confidence badge, warning banners, and disclaimer."
+        ),
+    )
     citations: list[Citation] = Field(
         default_factory=list,
         description="All inline citations linking summary claims to source records.",
