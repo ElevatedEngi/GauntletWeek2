@@ -112,6 +112,15 @@ class Settings(BaseSettings):
         le=720,
         description="Hours to keep generated summaries in the cache before expiry.",
     )
+    CONVERSATION_SESSION_TTL_HOURS: int = Field(
+        default=8,
+        ge=1,
+        le=168,
+        description=(
+            "Hours before a conversation session is considered expired. "
+            "After expiry a new session is created automatically."
+        ),
+    )
 
     # --- Rate Limiting ---
     RATE_LIMIT_PER_HOUR: int = Field(

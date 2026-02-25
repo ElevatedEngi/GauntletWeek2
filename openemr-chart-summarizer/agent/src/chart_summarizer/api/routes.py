@@ -22,6 +22,8 @@ Endpoints:
   GET  /api/v1/summarize/{summary_id}           — Retrieve a cached summary
   GET  /api/v1/summarize/{summary_id}/citations — Retrieve citations for a summary
   POST /api/v1/summarize/{summary_id}/feedback  — Submit clinician feedback
+  GET  /api/v1/conversations/{session_id}       — Retrieve a conversation session + turns
+  GET  /api/v1/conversations?patient_id=X      — List conversation sessions for a patient
   GET  /api/v1/health                           — Service health check (no auth)
   GET  /api/v1/config                           — Non-sensitive configuration (auth)
 """
@@ -210,7 +212,7 @@ async def create_summary(
     # --- Generate with 60-second hard timeout ---
     try:
         response: SummaryResponse = await asyncio.wait_for(
-            service.generate_summary(body),
+            service.generate_summary(body, db),
             timeout=60.0,
         )
     except asyncio.TimeoutError:
@@ -505,3 +507,134 @@ async def submit_feedback(
     )
 
     return FeedbackResponse(summary_id=summary_id, recorded=True)
+
+# ---------------------------------------------------------------------------
+# Conversation history
+# ---------------------------------------------------------------------------
+
+
+class ConversationTurnResponse(BaseModel):
+    turn_number: int
+    summary_id: Optional[str]
+    confidence_level: str
+    created_at: str
+
+
+class ConversationSessionResponse(BaseModel):
+    session_id: str
+    patient_id: str
+    specialty: str
+    created_at: str
+    expires_at: str
+    turn_count: int
+    turns: list[ConversationTurnResponse]
+
+
+class ConversationListItem(BaseModel):
+    session_id: str
+    specialty: str
+    created_at: str
+    expires_at: str
+    turn_count: int
+    is_expired: bool
+
+
+@router.get(
+    "/conversations/{session_id}",
+    response_model=ConversationSessionResponse,
+    summary="Retrieve a conversation session and its turns",
+    tags=["Conversations"],
+)
+async def get_conversation(
+    session_id: str,
+    user: UserIdentity = Depends(verify_token),
+    db: AsyncSession = Depends(get_db_session),
+) -> ConversationSessionResponse:
+    """
+    Retrieve a conversation session and all its completed turns.
+
+    Returns the session metadata and a list of turns in chronological order.
+    Each turn references the summary_id that can be retrieved via
+    GET /api/v1/summarize/{summary_id}.
+    """
+    result = await db.execute(
+        text(
+            "SELECT id, patient_id, specialty, created_at, expires_at, turn_count "
+            "FROM conversation_sessions WHERE id = :sid"
+        ),
+        {"sid": session_id},
+    )
+    session = result.fetchone()
+    if session is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Session '{session_id}' not found.",
+        )
+
+    turns_result = await db.execute(
+        text(
+            "SELECT turn_number, summary_id, confidence_level, created_at "
+            "FROM conversation_turns WHERE session_id = :sid ORDER BY turn_number ASC"
+        ),
+        {"sid": session_id},
+    )
+    turns = [
+        ConversationTurnResponse(
+            turn_number=r.turn_number,
+            summary_id=r.summary_id,
+            confidence_level=r.confidence_level,
+            created_at=str(r.created_at),
+        )
+        for r in turns_result.fetchall()
+    ]
+    return ConversationSessionResponse(
+        session_id=session.id,
+        patient_id=session.patient_id,
+        specialty=session.specialty,
+        created_at=str(session.created_at),
+        expires_at=str(session.expires_at),
+        turn_count=session.turn_count,
+        turns=turns,
+    )
+
+
+@router.get(
+    "/conversations",
+    response_model=list[ConversationListItem],
+    summary="List conversation sessions for a patient",
+    tags=["Conversations"],
+)
+async def list_conversations(
+    patient_id: str,
+    user: UserIdentity = Depends(verify_token),
+    db: AsyncSession = Depends(get_db_session),
+) -> list[ConversationListItem]:
+    """
+    List all conversation sessions for a given patient PID, newest first.
+
+    Use this to resume an existing session by passing the returned
+    session_id in the next POST /summarize request.
+
+    Returns the 20 most recent sessions. Expired sessions are included
+    with ``is_expired: true`` so the UI can display history.
+    """
+    now_iso = datetime.now(timezone.utc).isoformat()
+    result = await db.execute(
+        text(
+            "SELECT id, specialty, created_at, expires_at, turn_count "
+            "FROM conversation_sessions "
+            "WHERE patient_id = :pid ORDER BY created_at DESC LIMIT 20"
+        ),
+        {"pid": patient_id},
+    )
+    return [
+        ConversationListItem(
+            session_id=r.id,
+            specialty=r.specialty,
+            created_at=str(r.created_at),
+            expires_at=str(r.expires_at),
+            turn_count=r.turn_count,
+            is_expired=str(r.expires_at) < now_iso,
+        )
+        for r in result.fetchall()
+    ]

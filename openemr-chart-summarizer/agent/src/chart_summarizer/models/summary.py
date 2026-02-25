@@ -104,6 +104,29 @@ class SummaryRequest(BaseModel):
         default=None,
         description="Provider user ID — stored in the audit log.",
     )
+    session_id: Optional[str] = Field(
+        default=None,
+        description=(
+            "Conversation session ID. Pass to continue an existing session and "
+            "include prior summaries as context. Omit to start a new session. "
+            "The session_id is returned in the response for use in subsequent requests."
+        ),
+    )
+
+    @field_validator("session_id")
+    @classmethod
+    def validate_session_id(cls, v: Optional[str]) -> Optional[str]:
+        """Session ID must be a UUID4 string or None."""
+        if v is None:
+            return None
+        v = v.strip()
+        if not re.match(
+            r"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+            v,
+            re.IGNORECASE,
+        ):
+            raise ValueError("session_id must be a valid UUID4")
+        return v
 
     @field_validator("patient_id")
     @classmethod
@@ -187,6 +210,10 @@ class SummaryMetadata(BaseModel):
     generated_at: datetime = Field(default_factory=datetime.utcnow)
     data_sections_retrieved: list[str] = Field(default_factory=list)
     specialty_context: str = Field(default="primary_care")
+    session_id: Optional[str] = Field(
+        default=None,
+        description="The conversation session ID for this summary, new or existing.",
+    )
 
 
 class SummaryResponse(BaseModel):
@@ -221,6 +248,13 @@ class SummaryResponse(BaseModel):
         description=(
             "complete = all sections retrieved; partial = some data unavailable; "
             "failed = unable to generate."
+        ),
+    )
+    session_id: Optional[str] = Field(
+        default=None,
+        description=(
+            "Conversation session ID — pass this back in subsequent POST /summarize "
+            "requests to continue the conversation with prior context."
         ),
     )
     disclaimer: str = Field(

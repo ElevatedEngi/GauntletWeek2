@@ -64,6 +64,10 @@ class SummarizerState(TypedDict):
     # ── Retry control ────────────────────────────────────────────────────────
     retry_count: int            # Number of regeneration attempts so far
 
+    # ── Conversation context (optional — populated by SummaryService) ────────
+    session_id: Optional[str]           # Active conversation session UUID, or None
+    conversation_history: list[dict]    # Prior turns as LLM messages [{role, content}]
+
     # ── Output ───────────────────────────────────────────────────────────────
     final_summary: Optional[SummaryResponse]
     errors: list[str]           # Accumulated errors from any node

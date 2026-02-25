@@ -745,11 +745,26 @@ def make_generate_summary_node(llm_provider: Optional[Any] = None) -> Callable:
         errors: list[str] = list(state.get("errors") or [])
         metadata: dict[str, Any] = dict(state.get("metadata") or {})
 
+        # Inject prior conversation turns when history is available.
+        conversation_history: list[dict] = list(state.get("conversation_history") or [])
+        if conversation_history:
+            system_prompt += (
+                "\n\n────────────────────────────────────────\n"
+                "CONVERSATION CONTEXT:\n"
+                "Prior turns from this clinical review session are included in the "
+                "message history below. Do not repeat prior summaries verbatim — "
+                "focus on what the clinician is asking now. Apply the same citation "
+                "and safety rules to all claims regardless of prior context.\n"
+            )
+            messages = conversation_history + [{"role": "user", "content": user_content}]
+        else:
+            messages = [{"role": "user", "content": user_content}]
+
         gen_start = time.time()
         try:
             llm_response = await llm.generate(
                 system_prompt=system_prompt,
-                messages=[{"role": "user", "content": user_content}],
+                messages=messages,
             )
         except Exception as exc:
             logger.error("LLM generation failed: %s", exc)

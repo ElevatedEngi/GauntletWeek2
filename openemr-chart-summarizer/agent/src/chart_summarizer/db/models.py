@@ -156,3 +156,103 @@ class SummaryCache(Base):
         nullable=True,
         comment="user_id of the clinician who requested this summary.",
     )
+
+
+class ConversationSession(Base):
+    """
+    One conversation thread between a clinician and the Chart Summarizer.
+
+    Contains no PHI — patient_id is the OpenEMR PID only.
+    Sessions expire after CONVERSATION_SESSION_TTL_HOURS hours.
+    """
+
+    __tablename__ = "conversation_sessions"
+
+    id = Column(
+        String(36),
+        primary_key=True,
+        comment="UUID session identifier.",
+    )
+    patient_id = Column(
+        String(255),
+        nullable=False,
+        index=True,
+        comment="OpenEMR patient PID — NOT name, DOB, or other PHI.",
+    )
+    specialty = Column(
+        String(64),
+        nullable=False,
+        default="primary_care",
+    )
+    created_at = Column(
+        DateTime,
+        nullable=False,
+        default=datetime.utcnow,
+    )
+    expires_at = Column(
+        DateTime,
+        nullable=False,
+        index=True,
+        comment="Session is logically expired after this timestamp.",
+    )
+    created_by = Column(
+        String(255),
+        nullable=True,
+        comment="Provider user_id who opened this session.",
+    )
+    turn_count = Column(
+        Integer,
+        nullable=False,
+        default=0,
+        comment="Denormalised count of turns for quick checks.",
+    )
+
+
+class ConversationTurn(Base):
+    """
+    One completed request/summary pair within a conversation session.
+
+    summary_text stores only the raw markdown text (not full JSON)
+    to keep context injection efficient. The summary_id FK links to
+    summary_cache for full response retrieval when needed.
+    """
+
+    __tablename__ = "conversation_turns"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    session_id = Column(
+        String(36),
+        nullable=False,
+        index=True,
+        comment="FK to conversation_sessions.id.",
+    )
+    turn_number = Column(
+        Integer,
+        nullable=False,
+        comment="1-based turn index within the session.",
+    )
+    summary_id = Column(
+        String(36),
+        nullable=True,
+        comment="FK to summary_cache.id (nullable).",
+    )
+    request_json = Column(
+        Text,
+        nullable=False,
+        comment="JSON snapshot of SummaryRequest fields (no PHI).",
+    )
+    summary_text = Column(
+        Text,
+        nullable=False,
+        comment="Raw markdown summary text for history injection.",
+    )
+    confidence_level = Column(
+        String(8),
+        nullable=False,
+        comment="GREEN | YELLOW | RED",
+    )
+    created_at = Column(
+        DateTime,
+        nullable=False,
+        default=datetime.utcnow,
+    )
