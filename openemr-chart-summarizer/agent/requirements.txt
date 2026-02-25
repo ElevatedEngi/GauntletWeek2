@@ -33,12 +33,16 @@ tiktoken>=0.7.0
 # Markdown → HTML conversion for OpenEMR UI output (optional — falls back to <pre> wrap)
 markdown>=3.6
 
+# ROUGE-L scoring for eval framework (used by eval/scripts/run_eval.py)
+rouge-score>=0.1.2
+
 # ---------------------------------------------------------------------------
 # Development / test dependencies
 # ---------------------------------------------------------------------------
 
 pytest==9.0.2
 pytest-asyncio==1.3.0
+ruff>=0.4.0
 flake8==7.3.0
 black==26.1.0
 isort==7.0.0

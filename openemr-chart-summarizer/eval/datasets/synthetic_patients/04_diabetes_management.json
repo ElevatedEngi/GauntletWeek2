@@ -1,0 +1,97 @@
+{
+  "case_id": "04_diabetes_management",
+  "description": "55yo female with T2DM, A1C trending down over 18mo after adding semaglutide, retinopathy screening, podiatry",
+  "metadata": {
+    "complexity": "moderate",
+    "primary_specialty": "endocrinology"
+  },
+  "summary_request": {
+    "patient_id": "PT-004",
+    "specialty": "endocrinology",
+    "date_range_months": 18,
+    "requested_sections": [
+      "demographics", "conditions", "medications", "allergies",
+      "labs", "vitals", "encounters", "immunizations", "procedures"
+    ]
+  },
+  "fhir_bundle": {
+    "demographics": {
+      "resourceType": "Patient",
+      "id": "PT-004",
+      "name": [{"use": "official", "family": "Rodriguez", "given": ["Maria"]}],
+      "gender": "female",
+      "birthDate": "1970-07-28"
+    },
+    "conditions": [
+      {"resourceType": "Condition", "id": "COND-004-01", "clinicalStatus": {"coding": [{"code": "active"}]}, "code": {"coding": [{"code": "E11.9"}], "text": "Type 2 diabetes mellitus"}, "subject": {"reference": "Patient/PT-004"}, "onsetDateTime": "2018-03-01"},
+      {"resourceType": "Condition", "id": "COND-004-02", "clinicalStatus": {"coding": [{"code": "active"}]}, "code": {"coding": [{"code": "I10"}], "text": "Essential hypertension"}, "subject": {"reference": "Patient/PT-004"}},
+      {"resourceType": "Condition", "id": "COND-004-03", "clinicalStatus": {"coding": [{"code": "active"}]}, "code": {"coding": [{"code": "E78.5"}], "text": "Hyperlipidemia"}, "subject": {"reference": "Patient/PT-004"}},
+      {"resourceType": "Condition", "id": "COND-004-04", "clinicalStatus": {"coding": [{"code": "active"}]}, "code": {"coding": [{"code": "E11.319"}], "text": "Type 2 diabetes with mild nonproliferative diabetic retinopathy"}, "subject": {"reference": "Patient/PT-004"}},
+      {"resourceType": "Condition", "id": "COND-004-05", "clinicalStatus": {"coding": [{"code": "active"}]}, "code": {"coding": [{"code": "E11.40"}], "text": "Type 2 diabetes with diabetic peripheral neuropathy"}, "subject": {"reference": "Patient/PT-004"}}
+    ],
+    "medications": [
+      {"resourceType": "MedicationRequest", "id": "MED-004-01", "status": "active", "medicationCodeableConcept": {"text": "Metformin 1000mg BID"}, "subject": {"reference": "Patient/PT-004"}, "authoredOn": "2018-03-01"},
+      {"resourceType": "MedicationRequest", "id": "MED-004-02", "status": "active", "medicationCodeableConcept": {"text": "Semaglutide (Ozempic) 1mg subcutaneous weekly"}, "subject": {"reference": "Patient/PT-004"}, "authoredOn": "2025-05-01", "note": [{"text": "Added 6 months ago for additional glycemic control"}]},
+      {"resourceType": "MedicationRequest", "id": "MED-004-03", "status": "active", "medicationCodeableConcept": {"text": "Lisinopril 10mg daily"}, "subject": {"reference": "Patient/PT-004"}},
+      {"resourceType": "MedicationRequest", "id": "MED-004-04", "status": "active", "medicationCodeableConcept": {"text": "Atorvastatin 40mg nightly"}, "subject": {"reference": "Patient/PT-004"}},
+      {"resourceType": "MedicationRequest", "id": "MED-004-05", "status": "active", "medicationCodeableConcept": {"text": "Aspirin 81mg daily"}, "subject": {"reference": "Patient/PT-004"}}
+    ],
+    "allergies": [
+      {
+        "resourceType": "AllergyIntolerance",
+        "id": "ALLERGY-004-01",
+        "clinicalStatus": {"coding": [{"code": "active"}]},
+        "code": {"text": "Contrast dye (iodinated)"},
+        "patient": {"reference": "Patient/PT-004"},
+        "reaction": [{"manifestation": [{"text": "Hives / urticaria"}], "severity": "moderate"}]
+      }
+    ],
+    "labs": [
+      {"resourceType": "Observation", "id": "LAB-004-01", "status": "final", "code": {"text": "HbA1c"}, "subject": {"reference": "Patient/PT-004"}, "effectiveDateTime": "2024-05-01", "valueQuantity": {"value": 9.2, "unit": "%"}, "note": [{"text": "18 months ago — baseline before semaglutide"}]},
+      {"resourceType": "Observation", "id": "LAB-004-02", "status": "final", "code": {"text": "HbA1c"}, "subject": {"reference": "Patient/PT-004"}, "effectiveDateTime": "2024-11-01", "valueQuantity": {"value": 8.1, "unit": "%"}, "note": [{"text": "12 months ago"}]},
+      {"resourceType": "Observation", "id": "LAB-004-03", "status": "final", "code": {"text": "HbA1c"}, "subject": {"reference": "Patient/PT-004"}, "effectiveDateTime": "2025-05-01", "valueQuantity": {"value": 7.3, "unit": "%"}, "note": [{"text": "6 months ago — after starting semaglutide"}]},
+      {"resourceType": "Observation", "id": "LAB-004-04", "status": "final", "code": {"text": "HbA1c"}, "subject": {"reference": "Patient/PT-004"}, "effectiveDateTime": "2025-09-15", "valueQuantity": {"value": 6.8, "unit": "%"}, "note": [{"text": "Most recent — approaching target"}]},
+      {"resourceType": "Observation", "id": "LAB-004-05", "status": "final", "code": {"text": "Fasting glucose"}, "subject": {"reference": "Patient/PT-004"}, "effectiveDateTime": "2025-09-15", "valueQuantity": {"value": 142, "unit": "mg/dL"}},
+      {"resourceType": "Observation", "id": "LAB-004-06", "status": "final", "code": {"text": "eGFR"}, "subject": {"reference": "Patient/PT-004"}, "effectiveDateTime": "2025-09-15", "valueQuantity": {"value": 74, "unit": "mL/min"}},
+      {"resourceType": "Observation", "id": "LAB-004-07", "status": "final", "code": {"text": "Urine microalbumin/creatinine ratio"}, "subject": {"reference": "Patient/PT-004"}, "effectiveDateTime": "2025-09-15", "valueQuantity": {"value": 45, "unit": "mg/g"}, "note": [{"text": "Borderline — repeat in 3 months"}]}
+    ],
+    "vitals": [
+      {"resourceType": "Observation", "id": "VIT-004-01", "status": "final", "code": {"text": "Blood Pressure"}, "subject": {"reference": "Patient/PT-004"}, "effectiveDateTime": "2025-11-01", "component": [{"code": {"text": "Systolic"}, "valueQuantity": {"value": 136, "unit": "mmHg"}}, {"code": {"text": "Diastolic"}, "valueQuantity": {"value": 84, "unit": "mmHg"}}]},
+      {"resourceType": "Observation", "id": "VIT-004-02", "status": "final", "code": {"text": "Weight"}, "subject": {"reference": "Patient/PT-004"}, "effectiveDateTime": "2025-11-01", "valueQuantity": {"value": 182, "unit": "lbs"}},
+      {"resourceType": "Observation", "id": "VIT-004-03", "status": "final", "code": {"text": "BMI"}, "subject": {"reference": "Patient/PT-004"}, "effectiveDateTime": "2025-11-01", "valueQuantity": {"value": 32.1, "unit": "kg/m2"}}
+    ],
+    "encounters": [
+      {"resourceType": "Encounter", "id": "ENC-004-01", "status": "finished", "type": [{"text": "Endocrinology Follow-up"}], "subject": {"reference": "Patient/PT-004"}, "period": {"start": "2025-09-15"}},
+      {"resourceType": "Encounter", "id": "ENC-004-02", "status": "finished", "type": [{"text": "Ophthalmology — Dilated Eye Exam (diabetic retinopathy screening)"}], "subject": {"reference": "Patient/PT-004"}, "period": {"start": "2025-08-20"}},
+      {"resourceType": "Encounter", "id": "ENC-004-03", "status": "finished", "type": [{"text": "Podiatry — Diabetic Foot Exam"}], "subject": {"reference": "Patient/PT-004"}, "period": {"start": "2025-07-10"}},
+      {"resourceType": "Encounter", "id": "ENC-004-04", "status": "finished", "type": [{"text": "Primary Care"}], "subject": {"reference": "Patient/PT-004"}, "period": {"start": "2025-11-01"}}
+    ],
+    "immunizations": [
+      {"resourceType": "Immunization", "status": "completed", "vaccineCode": {"text": "Influenza vaccine"}, "patient": {"reference": "Patient/PT-004"}, "occurrenceDateTime": "2025-10-01"},
+      {"resourceType": "Immunization", "status": "completed", "vaccineCode": {"text": "Pneumococcal (PCV20)"}, "patient": {"reference": "Patient/PT-004"}, "occurrenceDateTime": "2024-06-01"}
+    ],
+    "procedures": [
+      {"resourceType": "Procedure", "status": "completed", "code": {"text": "Dilated fundoscopic eye exam — nonproliferative diabetic retinopathy noted"}, "subject": {"reference": "Patient/PT-004"}, "performedDateTime": "2025-08-20"},
+      {"resourceType": "Procedure", "status": "completed", "code": {"text": "Monofilament foot exam — reduced sensation plantar surface bilaterally"}, "subject": {"reference": "Patient/PT-004"}, "performedDateTime": "2025-07-10"},
+      {"resourceType": "Procedure", "status": "completed", "code": {"text": "Urine microalbumin/creatinine test"}, "subject": {"reference": "Patient/PT-004"}, "performedDateTime": "2025-09-15"}
+    ]
+  },
+  "gold_standard_summary": "## Patient Summary — Maria Rodriguez (DOB: 1970-07-28, Female, Age 55)\n\n**⚠️ ALLERGY: Contrast dye/iodinated contrast (hives) — avoid for imaging**\n\n**Active Conditions:** Type 2 diabetes mellitus with nonproliferative retinopathy and peripheral neuropathy; Essential hypertension; Hyperlipidemia.\n\n**Medications:** Metformin 1000mg BID, Semaglutide (Ozempic) 1mg weekly (started May 2025), Lisinopril 10mg, Atorvastatin 40mg, Aspirin 81mg.\n\n**A1C Trend (notable improvement):**\n- 18 months ago: 9.2% → 12 months: 8.1% → 6 months: 7.3% → Current: 6.8%\nSignificant improvement since adding semaglutide. Approaching target (<7%).\n\n**Other Labs (Sep 2025):** Fasting glucose 142 mg/dL, eGFR 74 mL/min (normal), Microalbumin/Cr 45 mg/g (borderline — repeat in 3 months).\n\n**Vitals:** BP 136/84 mmHg, BMI 32.1 kg/m².\n\n**Diabetic Surveillance:** Retinopathy screening (Aug 2025) — nonproliferative retinopathy found; Podiatry (Jul 2025) — reduced plantar sensation bilaterally (neuropathy).\n\n**Clinical Impression:** Good glycemic trajectory on metformin + semaglutide. Retinopathy and neuropathy require ongoing monitoring. Contrast allergy must be flagged for all imaging orders.\n\n---\n⚠️ DRAFT — AI-GENERATED — REQUIRES CLINICIAN REVIEW",
+  "must_appear": [
+    "metformin", "semaglutide", "A1C", "6.8", "retinopathy", "podiatry",
+    "neuropathy", "contrast dye", "9.2"
+  ],
+  "must_not_appear": [
+    "contrast safe", "no diabetic complications", "A1C normal", "insulin",
+    "type 1 diabetes"
+  ],
+  "expected_items": {
+    "medications": ["metformin", "semaglutide"],
+    "conditions": ["retinopathy", "neuropathy", "diabetes"],
+    "labs": ["A1C", "6.8", "9.2"],
+    "allergies": ["contrast"]
+  },
+  "expected_status": ["complete"],
+  "min_confidence_level": "YELLOW",
+  "is_safety_gate": false
+}

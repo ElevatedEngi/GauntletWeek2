@@ -53,8 +53,16 @@ import os
 import re
 import sys
 import time
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Optional
+
+# Optional ROUGE-L scoring (graceful degradation if rouge-score not installed).
+try:
+    from rouge_score import rouge_scorer as _rouge_scorer_lib  # type: ignore[import]
+    _ROUGE_AVAILABLE = True
+except ImportError:
+    _ROUGE_AVAILABLE = False
 
 # ---------------------------------------------------------------------------
 # Make the chart_summarizer package importable when this script is run
@@ -216,6 +224,35 @@ def score_completeness(
     return results
 
 
+def score_rouge_l(generated: str, reference: str) -> float:
+    """
+    Compute ROUGE-L F1 score between generated and gold-standard summaries.
+
+    Returns -1.0 (sentinel) if rouge-score is not installed or reference is empty.
+    """
+    if not _ROUGE_AVAILABLE or not reference or not generated:
+        return -1.0
+    scorer = _rouge_scorer_lib.RougeScorer(["rougeL"], use_stemmer=True)
+    return scorer.score(reference, generated)["rougeL"].fmeasure
+
+
+def score_hallucination_check(
+    summary_text: str,
+    must_not_appear: list[str],
+) -> tuple[float, list[str]]:
+    """
+    Verify no must_not_appear phrases are present in the generated summary.
+
+    Returns (score, found_list). score = 1.0 if clean, penalised per hallucination.
+    """
+    if not must_not_appear:
+        return 1.0, []
+    lower = summary_text.lower()
+    found = [fact for fact in must_not_appear if fact.lower() in lower]
+    score = max(0.0, 1.0 - len(found) / max(1, len(must_not_appear)))
+    return score, found
+
+
 def score_factual_accuracy(response: SummaryResponse) -> float:
     """
     Return the pipeline verifier's confidence_score (0.0-1.0).
@@ -302,6 +339,17 @@ async def evaluate_case_inline(
     accuracy = score_factual_accuracy(response)
     accuracy_passed = accuracy >= accuracy_threshold
 
+    # --- Hallucination detection (must_not_appear) ---
+    must_not_appear: list[str] = test_case.get("must_not_appear", [])
+    hallucination_score, hallucinated_found = score_hallucination_check(
+        response.summary_text, must_not_appear
+    )
+    hallucination_passed = hallucination_score >= 1.0  # clean = no hits
+
+    # --- ROUGE-L similarity to gold standard ---
+    gold_standard: str = test_case.get("gold_standard_summary", "")
+    rouge_l = score_rouge_l(response.summary_text, gold_standard)
+
     # --- Check status ---
     expected_statuses: list[str] = test_case.get("expected_status", ["complete", "partial"])
     status_passed = response.status in expected_statuses
@@ -320,9 +368,10 @@ async def evaluate_case_inline(
         and accuracy_passed
         and status_passed
         and confidence_passed
+        and (hallucination_passed or not must_not_appear)  # only gate if list was provided
     )
 
-    return {
+    result: dict[str, Any] = {
         "case_id": case_id,
         "description": test_case.get("description", ""),
         "passed": passed,
@@ -339,7 +388,14 @@ async def evaluate_case_inline(
         "latency_ms": latency_ms,
         "is_safety_gate": is_safety_gate,
         "flags": response.verification_result.flags,
+        # New Prompt5 metrics
+        "hallucination_score": round(hallucination_score, 4),
+        "hallucination_passed": hallucination_passed,
+        "hallucinated_phrases": hallucinated_found,
     }
+    if rouge_l >= 0:
+        result["rouge_l"] = round(rouge_l, 4)
+    return result
 
 
 # ---------------------------------------------------------------------------
@@ -398,14 +454,24 @@ def write_results(results: list[dict[str, Any]], output_dir: Path) -> None:
             lines.append(f"      ERROR: {r['error']}")
         else:
             acc = r.get("accuracy", 0.0)
-            lines.append(
-                f"      Accuracy={acc:.2%}  "
+            hall = r.get("hallucination_score", -1.0)
+            rouge = r.get("rouge_l", -1.0)
+            metrics_str = (
+                f"Accuracy={acc:.2%}  "
                 f"Status={r.get('status', '?')}  "
                 f"Confidence={r.get('confidence_level', '?')}"
             )
+            if hall >= 0:
+                metrics_str += f"  Hallucination={hall:.2%}"
+            if rouge >= 0:
+                metrics_str += f"  ROUGE-L={rouge:.3f}"
+            lines.append(f"      {metrics_str}")
             missing = [k for k, v in r.get("completeness_results", {}).items() if not v]
             if missing:
                 lines.append(f"      MISSING ITEMS: {', '.join(missing)}")
+            hallucinated = r.get("hallucinated_phrases", [])
+            if hallucinated:
+                lines.append(f"      HALLUCINATIONS: {', '.join(hallucinated)}")
             flags = r.get("flags", [])
             if flags:
                 lines.append(f"      FLAGS: {'; '.join(flags)}")
@@ -416,8 +482,22 @@ def write_results(results: list[dict[str, Any]], output_dir: Path) -> None:
     report_path = output_dir / "report.txt"
     report_path.write_text("\n".join(lines), encoding="utf-8")
 
+    # Append to history.jsonl for trend tracking over time.
+    history_path = output_dir / "history.jsonl"
+    history_record = {
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "total": total,
+        "passed": n_passed,
+        "failed": n_failed,
+        "safety_gate_failures": len(safety_failures),
+        "results": results,
+    }
+    with history_path.open("a", encoding="utf-8") as hf:
+        hf.write(json.dumps(history_record, default=str) + "\n")
+
     print(f"Results written to: {json_path}")
     print(f"Report written to:  {report_path}")
+    print(f"History updated:    {history_path}")
 
 
 # ---------------------------------------------------------------------------

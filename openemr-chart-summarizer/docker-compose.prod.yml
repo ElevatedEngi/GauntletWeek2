@@ -1,0 +1,151 @@
+# docker-compose.prod.yml — Production deployment configuration
+#
+# Copyright (C) 2026 OpenEMR Community — GPL v3
+#
+# Usage:
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+#
+# Before deploying:
+#   1. Create Docker secrets:
+#      echo "your-api-key"  | docker secret create agent_api_key -
+#      echo "your-llm-key"  | docker secret create llm_api_key -
+#      echo "your-db-pass"  | docker secret create mysql_password -
+#   2. Set GHCR image tag in .env.prod:
+#      AGENT_IMAGE=ghcr.io/your-org/openemr-chart-summarizer/chart-summarizer-agent:1.0.0
+#   3. Point OPENEMR_FHIR_BASE_URL to your production OpenEMR instance.
+
+services:
+  agent:
+    image: ${AGENT_IMAGE:-ghcr.io/openemr/openemr-chart-summarizer/chart-summarizer-agent:latest}
+    build: null                    # Never build in production — always use pinned image
+    environment:
+      # Secrets are mounted at /run/secrets/<name>.
+      # A production entrypoint (or your secret management system) should
+      # export these as env vars, OR use a secrets-aware pydantic-settings source.
+      AGENT_API_KEY_FILE: /run/secrets/agent_api_key
+      LLM_API_KEY_FILE:   /run/secrets/llm_api_key
+      LLM_PROVIDER:       ${LLM_PROVIDER:-anthropic}
+      LLM_MODEL:          ${LLM_MODEL:-claude-haiku-4-5-20251001}
+      OPENEMR_FHIR_BASE_URL: ${OPENEMR_FHIR_BASE_URL:-http://openemr:80/fhir}
+      DATABASE_URL:       ${DATABASE_URL:-sqlite+aiosqlite:///./chart_summarizer.db}
+      AUDIT_LOG_ENABLED:  "true"
+      HIPAA_MODE:         "true"
+      CORS_ORIGINS:       ${CORS_ORIGINS:-https://openemr.example.com}
+      LOG_LEVEL:          ${LOG_LEVEL:-INFO}
+    secrets:
+      - agent_api_key
+      - llm_api_key
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 1G
+        reservations:
+          cpus: "0.25"
+          memory: 256M
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+        tag: "chart-summarizer-agent"
+    networks:
+      - openemr-network    # Can reach OpenEMR and LLM API gateway
+    # No direct port exposure — fronted by OpenEMR's reverse proxy only
+    ports: []
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/health"]
+      interval: 30s
+      timeout: 10s
+      start_period: 20s
+      retries: 3
+
+  openemr:
+    image: openemr/openemr:8.0.0
+    environment:
+      MYSQL_HOST: mysql
+      MYSQL_ROOT_PASS_FILE: /run/secrets/mysql_password
+      MYSQL_USER: openemr
+      MYSQL_PASS_FILE: /run/secrets/mysql_password
+      # Never use AGENT_API_KEY directly in env — read from the PHP module's
+      # chart_summarizer_config table (set via the Admin Settings page).
+      CHART_SUMMARIZER_AGENT_URL: http://agent:8000
+    secrets:
+      - mysql_password
+    volumes:
+      - openemr_data:/var/www/localhost/htdocs/openemr/sites/default/documents
+      - openemr_logs:/var/www/localhost/htdocs/openemr/sites/default/logs
+      - ./module/ChartSummarizer:/var/www/localhost/htdocs/openemr/modules/ChartSummarizer:ro
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 2G
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    networks:
+      - openemr-network
+    ports:
+      - "80:80"
+      - "443:443"
+
+  mysql:
+    image: mysql:8.0
+    environment:
+      MYSQL_ROOT_PASSWORD_FILE: /run/secrets/mysql_password
+      MYSQL_DATABASE: openemr
+      MYSQL_USER: openemr
+      MYSQL_PASSWORD_FILE: /run/secrets/mysql_password
+    secrets:
+      - mysql_password
+    volumes:
+      - mysql_data:/var/lib/mysql
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 1G
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    networks:
+      - openemr-network
+    # No public port exposure — MySQL is internal only
+
+# ---------------------------------------------------------------------------
+# Docker Secrets
+# ---------------------------------------------------------------------------
+secrets:
+  agent_api_key:
+    external: true    # Created with: echo "key" | docker secret create agent_api_key -
+  llm_api_key:
+    external: true    # Created with: echo "key" | docker secret create llm_api_key -
+  mysql_password:
+    external: true    # Created with: echo "pass" | docker secret create mysql_password -
+
+# ---------------------------------------------------------------------------
+# Volumes
+# ---------------------------------------------------------------------------
+volumes:
+  openemr_data:
+    driver: local
+  openemr_logs:
+    driver: local
+  mysql_data:
+    driver: local
+
+# ---------------------------------------------------------------------------
+# Networks — agent only talks to OpenEMR and the LLM API (egress via NAT)
+# ---------------------------------------------------------------------------
+networks:
+  openemr-network:
+    driver: bridge
+    internal: false    # Allow egress for LLM API calls

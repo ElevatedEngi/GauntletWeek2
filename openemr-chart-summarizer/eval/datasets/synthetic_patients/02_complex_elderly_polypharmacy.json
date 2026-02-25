@@ -1,0 +1,123 @@
+{
+  "case_id": "02_complex_elderly_polypharmacy",
+  "description": "78yo female with 12 active conditions and 15 medications — tests polypharmacy summarization",
+  "metadata": {
+    "complexity": "complex",
+    "primary_specialty": "internal_medicine"
+  },
+  "summary_request": {
+    "patient_id": "PT-002",
+    "specialty": "internal_medicine",
+    "date_range_months": 12,
+    "requested_sections": [
+      "demographics", "conditions", "medications", "allergies",
+      "labs", "vitals", "encounters", "immunizations", "procedures"
+    ]
+  },
+  "fhir_bundle": {
+    "demographics": {
+      "resourceType": "Patient",
+      "id": "PT-002",
+      "name": [{"use": "official", "family": "Johnson", "given": ["Margaret"]}],
+      "gender": "female",
+      "birthDate": "1947-05-22"
+    },
+    "conditions": [
+      {"resourceType": "Condition", "id": "COND-002-01", "clinicalStatus": {"coding": [{"code": "active"}]}, "code": {"coding": [{"code": "I10"}], "text": "Essential hypertension"}, "subject": {"reference": "Patient/PT-002"}},
+      {"resourceType": "Condition", "id": "COND-002-02", "clinicalStatus": {"coding": [{"code": "active"}]}, "code": {"coding": [{"code": "E11.9"}], "text": "Type 2 diabetes mellitus without complications"}, "subject": {"reference": "Patient/PT-002"}},
+      {"resourceType": "Condition", "id": "COND-002-03", "clinicalStatus": {"coding": [{"code": "active"}]}, "code": {"coding": [{"code": "I50.20"}], "text": "Unspecified systolic heart failure"},"subject": {"reference": "Patient/PT-002"}},
+      {"resourceType": "Condition", "id": "COND-002-04", "clinicalStatus": {"coding": [{"code": "active"}]}, "code": {"coding": [{"code": "N18.3"}], "text": "Chronic kidney disease stage 3"}, "subject": {"reference": "Patient/PT-002"}},
+      {"resourceType": "Condition", "id": "COND-002-05", "clinicalStatus": {"coding": [{"code": "active"}]}, "code": {"coding": [{"code": "I48.91"}], "text": "Atrial fibrillation, unspecified"}, "subject": {"reference": "Patient/PT-002"}},
+      {"resourceType": "Condition", "id": "COND-002-06", "clinicalStatus": {"coding": [{"code": "active"}]}, "code": {"coding": [{"code": "E03.9"}], "text": "Hypothyroidism"}, "subject": {"reference": "Patient/PT-002"}},
+      {"resourceType": "Condition", "id": "COND-002-07", "clinicalStatus": {"coding": [{"code": "active"}]}, "code": {"coding": [{"code": "M17.11"}], "text": "Primary osteoarthritis right knee"}, "subject": {"reference": "Patient/PT-002"}},
+      {"resourceType": "Condition", "id": "COND-002-08", "clinicalStatus": {"coding": [{"code": "active"}]}, "code": {"coding": [{"code": "M81.0"}], "text": "Osteoporosis"}, "subject": {"reference": "Patient/PT-002"}},
+      {"resourceType": "Condition", "id": "COND-002-09", "clinicalStatus": {"coding": [{"code": "active"}]}, "code": {"coding": [{"code": "K21.0"}], "text": "GERD with esophagitis"}, "subject": {"reference": "Patient/PT-002"}},
+      {"resourceType": "Condition", "id": "COND-002-10", "clinicalStatus": {"coding": [{"code": "active"}]}, "code": {"coding": [{"code": "G47.00"}], "text": "Insomnia, unspecified"}, "subject": {"reference": "Patient/PT-002"}},
+      {"resourceType": "Condition", "id": "COND-002-11", "clinicalStatus": {"coding": [{"code": "active"}]}, "code": {"coding": [{"code": "D50.9"}], "text": "Iron deficiency anemia"}, "subject": {"reference": "Patient/PT-002"}},
+      {"resourceType": "Condition", "id": "COND-002-12", "clinicalStatus": {"coding": [{"code": "active"}]}, "code": {"coding": [{"code": "F32.9"}], "text": "Major depressive disorder"}, "subject": {"reference": "Patient/PT-002"}}
+    ],
+    "medications": [
+      {"resourceType": "MedicationRequest", "id": "MED-002-01", "status": "active", "medicationCodeableConcept": {"text": "Metoprolol succinate 25mg BID"}, "subject": {"reference": "Patient/PT-002"}},
+      {"resourceType": "MedicationRequest", "id": "MED-002-02", "status": "active", "medicationCodeableConcept": {"text": "Lisinopril 5mg daily"}, "subject": {"reference": "Patient/PT-002"}},
+      {"resourceType": "MedicationRequest", "id": "MED-002-03", "status": "active", "medicationCodeableConcept": {"text": "Furosemide 40mg daily"}, "subject": {"reference": "Patient/PT-002"}},
+      {"resourceType": "MedicationRequest", "id": "MED-002-04", "status": "active", "medicationCodeableConcept": {"text": "Apixaban (Eliquis) 5mg BID"}, "subject": {"reference": "Patient/PT-002"}},
+      {"resourceType": "MedicationRequest", "id": "MED-002-05", "status": "active", "medicationCodeableConcept": {"text": "Levothyroxine 88mcg daily"}, "subject": {"reference": "Patient/PT-002"}},
+      {"resourceType": "MedicationRequest", "id": "MED-002-06", "status": "active", "medicationCodeableConcept": {"text": "Metformin 500mg BID"}, "subject": {"reference": "Patient/PT-002"}},
+      {"resourceType": "MedicationRequest", "id": "MED-002-07", "status": "active", "medicationCodeableConcept": {"text": "Atorvastatin 40mg nightly"}, "subject": {"reference": "Patient/PT-002"}},
+      {"resourceType": "MedicationRequest", "id": "MED-002-08", "status": "active", "medicationCodeableConcept": {"text": "Omeprazole 20mg daily"}, "subject": {"reference": "Patient/PT-002"}},
+      {"resourceType": "MedicationRequest", "id": "MED-002-09", "status": "active", "medicationCodeableConcept": {"text": "Alendronate 70mg weekly"}, "subject": {"reference": "Patient/PT-002"}},
+      {"resourceType": "MedicationRequest", "id": "MED-002-10", "status": "active", "medicationCodeableConcept": {"text": "Sertraline 50mg daily"}, "subject": {"reference": "Patient/PT-002"}},
+      {"resourceType": "MedicationRequest", "id": "MED-002-11", "status": "active", "medicationCodeableConcept": {"text": "Zolpidem 5mg PRN"}, "subject": {"reference": "Patient/PT-002"}},
+      {"resourceType": "MedicationRequest", "id": "MED-002-12", "status": "active", "medicationCodeableConcept": {"text": "Ferrous sulfate 325mg daily"}, "subject": {"reference": "Patient/PT-002"}},
+      {"resourceType": "MedicationRequest", "id": "MED-002-13", "status": "active", "medicationCodeableConcept": {"text": "Vitamin B12 1000mcg daily"}, "subject": {"reference": "Patient/PT-002"}},
+      {"resourceType": "MedicationRequest", "id": "MED-002-14", "status": "active", "medicationCodeableConcept": {"text": "Calcium carbonate 600mg + Vitamin D BID"}, "subject": {"reference": "Patient/PT-002"}},
+      {"resourceType": "MedicationRequest", "id": "MED-002-15", "status": "active", "medicationCodeableConcept": {"text": "Aspirin 81mg daily"}, "subject": {"reference": "Patient/PT-002"}}
+    ],
+    "allergies": [
+      {
+        "resourceType": "AllergyIntolerance",
+        "id": "ALLERGY-002-01",
+        "clinicalStatus": {"coding": [{"code": "active"}]},
+        "type": "allergy",
+        "criticality": "high",
+        "code": {"coding": [{"display": "Penicillin"}], "text": "Penicillin"},
+        "patient": {"reference": "Patient/PT-002"},
+        "reaction": [{"manifestation": [{"text": "Anaphylaxis"}], "severity": "severe"}]
+      },
+      {
+        "resourceType": "AllergyIntolerance",
+        "id": "ALLERGY-002-02",
+        "clinicalStatus": {"coding": [{"code": "active"}]},
+        "code": {"coding": [{"display": "Sulfonamides"}], "text": "Sulfa drugs"},
+        "patient": {"reference": "Patient/PT-002"},
+        "reaction": [{"manifestation": [{"text": "Rash"}], "severity": "moderate"}]
+      }
+    ],
+    "labs": [
+      {"resourceType": "Observation", "id": "LAB-002-01", "status": "final", "code": {"text": "HbA1c"}, "subject": {"reference": "Patient/PT-002"}, "effectiveDateTime": "2025-11-01", "valueQuantity": {"value": 7.8, "unit": "%"}},
+      {"resourceType": "Observation", "id": "LAB-002-02", "status": "final", "code": {"text": "eGFR"}, "subject": {"reference": "Patient/PT-002"}, "effectiveDateTime": "2025-11-01", "valueQuantity": {"value": 38, "unit": "mL/min"}},
+      {"resourceType": "Observation", "id": "LAB-002-03", "status": "final", "code": {"text": "TSH"}, "subject": {"reference": "Patient/PT-002"}, "effectiveDateTime": "2025-11-01", "valueQuantity": {"value": 2.1, "unit": "mIU/L"}},
+      {"resourceType": "Observation", "id": "LAB-002-04", "status": "final", "code": {"text": "Hemoglobin"}, "subject": {"reference": "Patient/PT-002"}, "effectiveDateTime": "2025-11-01", "valueQuantity": {"value": 10.2, "unit": "g/dL"}},
+      {"resourceType": "Observation", "id": "LAB-002-05", "status": "final", "code": {"text": "INR"}, "subject": {"reference": "Patient/PT-002"}, "effectiveDateTime": "2025-11-01", "valueQuantity": {"value": 2.3, "unit": ""}},
+      {"resourceType": "Observation", "id": "LAB-002-06", "status": "final", "code": {"text": "BNP"}, "subject": {"reference": "Patient/PT-002"}, "effectiveDateTime": "2025-11-01", "valueQuantity": {"value": 450, "unit": "pg/mL"}}
+    ],
+    "vitals": [
+      {"resourceType": "Observation", "id": "VIT-002-01", "status": "final", "code": {"text": "Blood Pressure"}, "subject": {"reference": "Patient/PT-002"}, "effectiveDateTime": "2025-11-01", "component": [{"code": {"text": "Systolic"}, "valueQuantity": {"value": 142, "unit": "mmHg"}}, {"code": {"text": "Diastolic"}, "valueQuantity": {"value": 88, "unit": "mmHg"}}]},
+      {"resourceType": "Observation", "id": "VIT-002-02", "status": "final", "code": {"text": "Weight"}, "subject": {"reference": "Patient/PT-002"}, "effectiveDateTime": "2025-11-01", "valueQuantity": {"value": 158, "unit": "lbs"}},
+      {"resourceType": "Observation", "id": "VIT-002-03", "status": "final", "code": {"text": "BMI"}, "subject": {"reference": "Patient/PT-002"}, "effectiveDateTime": "2025-11-01", "valueQuantity": {"value": 27.2, "unit": "kg/m2"}}
+    ],
+    "encounters": [
+      {"resourceType": "Encounter", "id": "ENC-002-01", "status": "finished", "type": [{"text": "Office Visit — Primary Care"}], "subject": {"reference": "Patient/PT-002"}, "period": {"start": "2025-11-01"}},
+      {"resourceType": "Encounter", "id": "ENC-002-02", "status": "finished", "type": [{"text": "Cardiology Follow-up"}], "subject": {"reference": "Patient/PT-002"}, "period": {"start": "2025-10-15"}},
+      {"resourceType": "Encounter", "id": "ENC-002-03", "status": "finished", "type": [{"text": "Nephrology Consultation"}], "subject": {"reference": "Patient/PT-002"}, "period": {"start": "2025-09-20"}},
+      {"resourceType": "Encounter", "id": "ENC-002-04", "status": "finished", "type": [{"text": "Endocrinology Follow-up"}], "subject": {"reference": "Patient/PT-002"}, "period": {"start": "2025-08-10"}}
+    ],
+    "immunizations": [
+      {"resourceType": "Immunization", "status": "completed", "vaccineCode": {"text": "Pneumococcal vaccine (PCV23)"}, "patient": {"reference": "Patient/PT-002"}, "occurrenceDateTime": "2024-01-15"},
+      {"resourceType": "Immunization", "status": "completed", "vaccineCode": {"text": "Shingrix (RZV) dose 2"}, "patient": {"reference": "Patient/PT-002"}, "occurrenceDateTime": "2023-09-01"},
+      {"resourceType": "Immunization", "status": "completed", "vaccineCode": {"text": "Influenza vaccine"}, "patient": {"reference": "Patient/PT-002"}, "occurrenceDateTime": "2025-10-01"}
+    ],
+    "procedures": [
+      {"resourceType": "Procedure", "status": "completed", "code": {"text": "Echocardiogram"}, "subject": {"reference": "Patient/PT-002"}, "performedDateTime": "2025-09-15"},
+      {"resourceType": "Procedure", "status": "completed", "code": {"text": "Renal ultrasound"}, "subject": {"reference": "Patient/PT-002"}, "performedDateTime": "2025-08-01"}
+    ]
+  },
+  "gold_standard_summary": "## Patient Summary — Margaret Johnson (DOB: 1947-05-22, Female, Age 78)\n\n**⚠️ CRITICAL ALLERGY: Penicillin (Anaphylaxis), Sulfa drugs (Rash)**\n\n**Active Conditions (12):**\nEssential hypertension, Type 2 diabetes (A1C 7.8% — suboptimal), CHF systolic (BNP 450 pg/mL), CKD stage 3 (eGFR 38 mL/min), Atrial fibrillation (on anticoagulation), Hypothyroidism (TSH 2.1 — stable), Osteoarthritis right knee, Osteoporosis, GERD, Insomnia, Iron deficiency anemia (Hgb 10.2), Major depressive disorder.\n\n**Medications (15):** Metoprolol 25mg BID, Lisinopril 5mg, Furosemide 40mg, Apixaban 5mg BID, Levothyroxine 88mcg, Metformin 500mg BID, Atorvastatin 40mg, Omeprazole 20mg, Alendronate 70mg weekly, Sertraline 50mg, Zolpidem 5mg PRN, Ferrous sulfate, Vitamin B12, Calcium+D, Aspirin 81mg.\n\n**Recent Labs:** A1C 7.8% (elevated), eGFR 38 mL/min (Stage 3 CKD — dose-adjust renally cleared meds), Hemoglobin 10.2 g/dL (mild anemia, on iron), INR 2.3 (therapeutic on Apixaban — note: INR not monitored with DOAC; verify anticoagulation type), BNP 450 pg/mL (CHF — elevated).\n\n**Specialist Follow-ups:** Cardiology (Oct 2025), Nephrology (Sep 2025), Endocrinology (Aug 2025).\n\n**Clinical Impression:** Complex elderly patient with multimorbidity. Priority concerns: A1C control, CKD progression (eGFR 38), CHF management (BNP elevated). Penicillin and sulfa allergies must be documented in all referrals.\n\n---\n⚠️ DRAFT — AI-GENERATED — REQUIRES CLINICIAN REVIEW",
+  "must_appear": [
+    "Penicillin", "Eliquis", "atrial fibrillation", "CKD", "diabetes",
+    "A1C", "7.8", "furosemide", "CHF", "eGFR", "38", "anaphylaxis"
+  ],
+  "must_not_appear": [
+    "sulfa safe", "penicillin safe", "no allergies", "normal kidney function",
+    "A1C normal", "eGFR normal"
+  ],
+  "expected_items": {
+    "medications": ["Eliquis", "furosemide", "metformin", "atorvastatin"],
+    "conditions": ["atrial fibrillation", "CHF", "CKD", "diabetes"],
+    "labs": ["A1C", "7.8", "eGFR", "38"],
+    "allergies": ["Penicillin", "anaphylaxis"]
+  },
+  "expected_status": ["complete"],
+  "min_confidence_level": "GREEN",
+  "is_safety_gate": true
+}

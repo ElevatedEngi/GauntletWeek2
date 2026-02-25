@@ -1,0 +1,92 @@
+{
+  "case_id": "03_pediatric_well_child",
+  "description": "4yo healthy male, well-child visit, immunization series, growth at 50th percentile",
+  "metadata": {
+    "complexity": "simple",
+    "primary_specialty": "pediatrics"
+  },
+  "summary_request": {
+    "patient_id": "PT-003",
+    "specialty": "pediatrics",
+    "date_range_months": 12,
+    "requested_sections": [
+      "demographics", "conditions", "medications", "allergies",
+      "labs", "vitals", "encounters", "immunizations", "procedures"
+    ]
+  },
+  "fhir_bundle": {
+    "demographics": {
+      "resourceType": "Patient",
+      "id": "PT-003",
+      "name": [{"use": "official", "family": "Chen", "given": ["Lucas"]}],
+      "gender": "male",
+      "birthDate": "2021-06-10"
+    },
+    "conditions": [],
+    "medications": [
+      {
+        "resourceType": "MedicationRequest",
+        "id": "MED-003-01",
+        "status": "active",
+        "medicationCodeableConcept": {"text": "Fluoride supplement 0.5mg daily"},
+        "subject": {"reference": "Patient/PT-003"}
+      }
+    ],
+    "allergies": [
+      {
+        "resourceType": "AllergyIntolerance",
+        "id": "ALLERGY-003-01",
+        "clinicalStatus": {"coding": [{"code": "active"}]},
+        "code": {"text": "No known allergies"},
+        "patient": {"reference": "Patient/PT-003"}
+      }
+    ],
+    "labs": [
+      {"resourceType": "Observation", "id": "LAB-003-01", "status": "final", "code": {"text": "Lead screening"}, "subject": {"reference": "Patient/PT-003"}, "effectiveDateTime": "2025-06-15", "valueQuantity": {"value": 2, "unit": "mcg/dL"}},
+      {"resourceType": "Observation", "id": "LAB-003-02", "status": "final", "code": {"text": "Hemoglobin"}, "subject": {"reference": "Patient/PT-003"}, "effectiveDateTime": "2025-06-15", "valueQuantity": {"value": 12.1, "unit": "g/dL"}}
+    ],
+    "vitals": [
+      {"resourceType": "Observation", "id": "VIT-003-01", "status": "final", "code": {"text": "Height"}, "subject": {"reference": "Patient/PT-003"}, "effectiveDateTime": "2025-06-15", "valueQuantity": {"value": 103, "unit": "cm"}, "note": [{"text": "55th percentile for age"}]},
+      {"resourceType": "Observation", "id": "VIT-003-02", "status": "final", "code": {"text": "Weight"}, "subject": {"reference": "Patient/PT-003"}, "effectiveDateTime": "2025-06-15", "valueQuantity": {"value": 17, "unit": "kg"}, "note": [{"text": "50th percentile for age"}]},
+      {"resourceType": "Observation", "id": "VIT-003-03", "status": "final", "code": {"text": "BMI"}, "subject": {"reference": "Patient/PT-003"}, "effectiveDateTime": "2025-06-15", "valueQuantity": {"value": 16.0, "unit": "kg/m2"}, "note": [{"text": "50th percentile for age"}]}
+    ],
+    "encounters": [
+      {
+        "resourceType": "Encounter",
+        "id": "ENC-003-01",
+        "status": "finished",
+        "type": [{"text": "4-year well-child visit"}],
+        "subject": {"reference": "Patient/PT-003"},
+        "period": {"start": "2025-06-15"}
+      }
+    ],
+    "immunizations": [
+      {"resourceType": "Immunization", "status": "completed", "vaccineCode": {"text": "DTaP (diphtheria, tetanus, pertussis) dose 5"}, "patient": {"reference": "Patient/PT-003"}, "occurrenceDateTime": "2025-06-15"},
+      {"resourceType": "Immunization", "status": "completed", "vaccineCode": {"text": "MMR (measles, mumps, rubella) dose 2"}, "patient": {"reference": "Patient/PT-003"}, "occurrenceDateTime": "2025-06-15"},
+      {"resourceType": "Immunization", "status": "completed", "vaccineCode": {"text": "Varicella (chickenpox) dose 2"}, "patient": {"reference": "Patient/PT-003"}, "occurrenceDateTime": "2025-06-15"},
+      {"resourceType": "Immunization", "status": "completed", "vaccineCode": {"text": "IPV (inactivated poliovirus) dose 4"}, "patient": {"reference": "Patient/PT-003"}, "occurrenceDateTime": "2025-06-15"},
+      {"resourceType": "Immunization", "status": "completed", "vaccineCode": {"text": "Influenza vaccine"}, "patient": {"reference": "Patient/PT-003"}, "occurrenceDateTime": "2024-10-10"}
+    ],
+    "procedures": [
+      {"resourceType": "Procedure", "status": "completed", "code": {"text": "Vision screening — passed"}, "subject": {"reference": "Patient/PT-003"}, "performedDateTime": "2025-06-15"},
+      {"resourceType": "Procedure", "status": "completed", "code": {"text": "Hearing screening — passed"}, "subject": {"reference": "Patient/PT-003"}, "performedDateTime": "2025-06-15"}
+    ]
+  },
+  "gold_standard_summary": "## Patient Summary — Lucas Chen (DOB: 2021-06-10, Male, Age 4)\n\n**Visit Type:** 4-year well-child visit (June 2025).\n\n**Active Conditions:** None. Well child — no chronic conditions.\n\n**Medications:** Fluoride supplement 0.5 mg daily (dental caries prevention).\n\n**Allergies:** No known allergies.\n\n**Growth (2025-06-15):**\n- Height: 103 cm (55th percentile)\n- Weight: 17 kg (50th percentile)\n- BMI: 16.0 kg/m² (50th percentile)\nGrowth is appropriate for age.\n\n**Labs (2025-06-15):** Lead screening 2 mcg/dL (normal, < 3.5 threshold). Hemoglobin 12.1 g/dL (normal).\n\n**Immunizations (2025-06-15 — all up to date):**\n- DTaP #5, MMR #2, Varicella #2, IPV #4 — all administered\n- Influenza (Oct 2024)\n\n**Developmental Screening:** Vision and hearing screening passed.\n\n**Clinical Impression:** Healthy 4-year-old male at appropriate developmental milestones. Immunizations up to date. Continue annual well-child visits; next flu vaccine Oct/Nov 2025.\n\n---\n⚠️ DRAFT — AI-GENERATED — REQUIRES CLINICIAN REVIEW",
+  "must_appear": [
+    "DTaP", "MMR", "Varicella", "4-year", "growth", "50th percentile",
+    "fluoride", "no known allergies", "hearing", "vision"
+  ],
+  "must_not_appear": [
+    "diabetes", "hypertension", "allergy", "cancer", "heart disease",
+    "chronic condition", "medication allergy"
+  ],
+  "expected_items": {
+    "immunizations": ["DTaP", "MMR", "Varicella"],
+    "vitals": ["50th percentile", "growth"],
+    "allergies": ["no known allergies"]
+  },
+  "expected_status": ["complete"],
+  "min_confidence_level": "GREEN",
+  "is_safety_gate": false
+}

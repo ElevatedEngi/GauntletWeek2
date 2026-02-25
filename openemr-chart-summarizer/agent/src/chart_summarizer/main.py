@@ -29,7 +29,11 @@ from typing import AsyncGenerator
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from chart_summarizer.api.middleware import AuditMiddleware, RequestLoggingMiddleware
+from chart_summarizer.api.middleware import (
+    AuditMiddleware,
+    RequestLoggingMiddleware,
+    SecurityHeadersMiddleware,
+)
 from chart_summarizer.api.routes import router
 from chart_summarizer.config import settings
 from chart_summarizer.db.engine import init_db
@@ -119,6 +123,7 @@ def create_app() -> FastAPI:
     # ------------------------------------------------------------------
     app.add_middleware(AuditMiddleware)
     app.add_middleware(RequestLoggingMiddleware)
+    app.add_middleware(SecurityHeadersMiddleware)  # outermost: sets headers on all responses
 
     # ------------------------------------------------------------------
     # Routes — all mounted under /api/v1

@@ -1,0 +1,89 @@
+{
+  "case_id": "08_multilingual_patient",
+  "description": "51yo Spanish-speaking female, bilingual encounter notes (English and Spanish), hypertension and T2DM managed at community health center; agent must summarize key clinical content regardless of note language",
+  "metadata": {
+    "complexity": "moderate",
+    "primary_specialty": "primary_care"
+  },
+  "summary_request": {
+    "patient_id": "PT-008",
+    "specialty": "primary_care",
+    "date_range_months": 12,
+    "requested_sections": [
+      "demographics", "conditions", "medications", "allergies",
+      "labs", "vitals", "encounters", "immunizations", "procedures"
+    ]
+  },
+  "fhir_bundle": {
+    "demographics": {
+      "resourceType": "Patient",
+      "id": "PT-008",
+      "name": [{"use": "official", "family": "Gutierrez-Vega", "given": ["Rosa"]}],
+      "gender": "female",
+      "birthDate": "1974-11-22",
+      "communication": [{"language": {"coding": [{"code": "es"}], "text": "Spanish"}, "preferred": true}]
+    },
+    "conditions": [
+      {"resourceType": "Condition", "id": "COND-008-01", "clinicalStatus": {"coding": [{"code": "active"}]}, "code": {"coding": [{"code": "I10"}], "text": "Essential hypertension / Hipertensión arterial esencial"}, "subject": {"reference": "Patient/PT-008"}, "onsetDateTime": "2019-05-01"},
+      {"resourceType": "Condition", "id": "COND-008-02", "clinicalStatus": {"coding": [{"code": "active"}]}, "code": {"coding": [{"code": "E11.9"}], "text": "Type 2 diabetes mellitus / Diabetes mellitus tipo 2"}, "subject": {"reference": "Patient/PT-008"}, "onsetDateTime": "2021-09-01"},
+      {"resourceType": "Condition", "id": "COND-008-03", "clinicalStatus": {"coding": [{"code": "active"}]}, "code": {"coding": [{"code": "E66.9"}], "text": "Obesity / Obesidad"}, "subject": {"reference": "Patient/PT-008"}},
+      {"resourceType": "Condition", "id": "COND-008-04", "clinicalStatus": {"coding": [{"code": "active"}]}, "code": {"coding": [{"code": "Z87.891"}], "text": "Personal history of nicotine dependence — quit 2020"}, "subject": {"reference": "Patient/PT-008"}}
+    ],
+    "medications": [
+      {"resourceType": "MedicationRequest", "id": "MED-008-01", "status": "active", "medicationCodeableConcept": {"text": "Amlodipine 10mg daily (Norvasc)"}, "subject": {"reference": "Patient/PT-008"}, "authoredOn": "2019-06-01"},
+      {"resourceType": "MedicationRequest", "id": "MED-008-02", "status": "active", "medicationCodeableConcept": {"text": "Losartan 100mg daily"}, "subject": {"reference": "Patient/PT-008"}, "authoredOn": "2020-01-01"},
+      {"resourceType": "MedicationRequest", "id": "MED-008-03", "status": "active", "medicationCodeableConcept": {"text": "Metformin 1000mg BID"}, "subject": {"reference": "Patient/PT-008"}, "authoredOn": "2021-10-01"},
+      {"resourceType": "MedicationRequest", "id": "MED-008-04", "status": "active", "medicationCodeableConcept": {"text": "Atorvastatin 20mg nightly"}, "subject": {"reference": "Patient/PT-008"}, "authoredOn": "2022-03-01"}
+    ],
+    "allergies": [
+      {
+        "resourceType": "AllergyIntolerance",
+        "id": "ALLERGY-008-01",
+        "clinicalStatus": {"coding": [{"code": "active"}]},
+        "code": {"text": "Sulfonamides (sulfa drugs)"},
+        "patient": {"reference": "Patient/PT-008"},
+        "reaction": [{"manifestation": [{"text": "Rash / Erupción cutánea"}], "severity": "mild"}]
+      }
+    ],
+    "labs": [
+      {"resourceType": "Observation", "id": "LAB-008-01", "status": "final", "code": {"text": "HbA1c"}, "subject": {"reference": "Patient/PT-008"}, "effectiveDateTime": "2025-05-01", "valueQuantity": {"value": 8.6, "unit": "%"}},
+      {"resourceType": "Observation", "id": "LAB-008-02", "status": "final", "code": {"text": "HbA1c"}, "subject": {"reference": "Patient/PT-008"}, "effectiveDateTime": "2025-11-01", "valueQuantity": {"value": 7.9, "unit": "%"}, "note": [{"text": "Improving — patient increased activity and changed diet (dietitian referral helpful)"}]},
+      {"resourceType": "Observation", "id": "LAB-008-03", "status": "final", "code": {"text": "Fasting glucose / Glucosa en ayunas"}, "subject": {"reference": "Patient/PT-008"}, "effectiveDateTime": "2025-11-01", "valueQuantity": {"value": 168, "unit": "mg/dL"}},
+      {"resourceType": "Observation", "id": "LAB-008-04", "status": "final", "code": {"text": "LDL cholesterol"}, "subject": {"reference": "Patient/PT-008"}, "effectiveDateTime": "2025-11-01", "valueQuantity": {"value": 98, "unit": "mg/dL"}},
+      {"resourceType": "Observation", "id": "LAB-008-05", "status": "final", "code": {"text": "eGFR"}, "subject": {"reference": "Patient/PT-008"}, "effectiveDateTime": "2025-11-01", "valueQuantity": {"value": 81, "unit": "mL/min"}}
+    ],
+    "vitals": [
+      {"resourceType": "Observation", "id": "VIT-008-01", "status": "final", "code": {"text": "Blood Pressure"}, "subject": {"reference": "Patient/PT-008"}, "effectiveDateTime": "2025-11-01", "component": [{"code": {"text": "Systolic"}, "valueQuantity": {"value": 144, "unit": "mmHg"}}, {"code": {"text": "Diastolic"}, "valueQuantity": {"value": 88, "unit": "mmHg"}}], "note": [{"text": "Nota: presión arterial elevada hoy — posible estrés laboral reportado por paciente"}]},
+      {"resourceType": "Observation", "id": "VIT-008-02", "status": "final", "code": {"text": "Weight"}, "subject": {"reference": "Patient/PT-008"}, "effectiveDateTime": "2025-11-01", "valueQuantity": {"value": 201, "unit": "lbs"}},
+      {"resourceType": "Observation", "id": "VIT-008-03", "status": "final", "code": {"text": "BMI"}, "subject": {"reference": "Patient/PT-008"}, "effectiveDateTime": "2025-11-01", "valueQuantity": {"value": 34.2, "unit": "kg/m2"}}
+    ],
+    "encounters": [
+      {"resourceType": "Encounter", "id": "ENC-008-01", "status": "finished", "type": [{"text": "Primary Care Follow-up — conducted in Spanish with medical interpreter"}], "subject": {"reference": "Patient/PT-008"}, "period": {"start": "2025-05-01"}, "note": [{"text": "Visita de seguimiento. Se ajustó metformina. Referido a nutricionista. Paciente habla principalmente español."}]},
+      {"resourceType": "Encounter", "id": "ENC-008-02", "status": "finished", "type": [{"text": "Primary Care Follow-up (current) — Spanish language"}], "subject": {"reference": "Patient/PT-008"}, "period": {"start": "2025-11-01"}, "note": [{"text": "Follow-up visit. A1C improved from 8.6 to 7.9. BP elevated today — patient reports work stress (estrés laboral). Medication compliance confirmed. Continue current regimen."}]},
+      {"resourceType": "Encounter", "id": "ENC-008-03", "status": "finished", "type": [{"text": "Dietitian consult / Consulta nutricional"}], "subject": {"reference": "Patient/PT-008"}, "period": {"start": "2025-07-15"}}
+    ],
+    "immunizations": [
+      {"resourceType": "Immunization", "status": "completed", "vaccineCode": {"text": "Influenza vaccine"}, "patient": {"reference": "Patient/PT-008"}, "occurrenceDateTime": "2025-09-20"},
+      {"resourceType": "Immunization", "status": "completed", "vaccineCode": {"text": "COVID-19 booster (mRNA)"}, "patient": {"reference": "Patient/PT-008"}, "occurrenceDateTime": "2025-09-20"}
+    ],
+    "procedures": []
+  },
+  "gold_standard_summary": "## Patient Summary — Rosa Gutierrez-Vega (DOB: 1974-11-22, Female, Age 51)\n\n**⚠️ ALLERGY: Sulfonamides (sulfa drugs) — rash.**\n\n**Language note: Spanish-speaking patient (preferred language Spanish); encounters conducted with interpreter.**\n\n**Active Conditions:** Essential hypertension; Type 2 diabetes mellitus; Obesity (BMI 34.2). Former smoker — quit 2020.\n\n**Medications:** Amlodipine 10mg, Losartan 100mg, Metformin 1000mg BID, Atorvastatin 20mg.\n\n**A1C Trend:** 8.6% (May 2025) → 7.9% (Nov 2025) — improving after dietitian referral and lifestyle changes.\n\n**Labs (Nov 2025):** Fasting glucose 168 mg/dL, LDL 98 mg/dL, eGFR 81 mL/min (normal).\n\n**Vitals (Nov 2025):** BP 144/88 mmHg (elevated; patient reports work stress), BMI 34.2 kg/m².\n\n**Clinical Impression:** Improving glycemic control on metformin. BP suboptimally controlled — consider titration. Sulfa allergy documented. Continue dietitian follow-up.\n\n---\n⚠️ DRAFT — AI-GENERATED — REQUIRES CLINICIAN REVIEW",
+  "must_appear": [
+    "sulfonamides", "A1C", "7.9", "8.6", "metformin", "amlodipine",
+    "losartan", "hypertension", "diabetes", "dietitian"
+  ],
+  "must_not_appear": [
+    "no allergies", "English-only", "A1C normal", "insulin",
+    "sulfa safe", "no diabetes"
+  ],
+  "expected_items": {
+    "medications": ["metformin", "amlodipine", "losartan", "atorvastatin"],
+    "conditions": ["hypertension", "diabetes", "obesity"],
+    "labs": ["A1C", "7.9", "8.6"],
+    "allergies": ["sulfonamides", "sulfa"]
+  },
+  "expected_status": ["complete"],
+  "min_confidence_level": "YELLOW",
+  "is_safety_gate": false
+}

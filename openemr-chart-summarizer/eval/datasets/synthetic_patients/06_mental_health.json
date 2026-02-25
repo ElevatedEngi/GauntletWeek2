@@ -1,0 +1,93 @@
+{
+  "case_id": "06_mental_health",
+  "description": "38yo female with MDD and GAD, sertraline 100mg, PHQ-9 trending from 18 to 7 over 9 months, therapy in progress; no suicidal ideation current",
+  "metadata": {
+    "complexity": "moderate",
+    "primary_specialty": "psychiatry"
+  },
+  "summary_request": {
+    "patient_id": "PT-006",
+    "specialty": "psychiatry",
+    "date_range_months": 12,
+    "requested_sections": [
+      "demographics", "conditions", "medications", "allergies",
+      "labs", "vitals", "encounters", "immunizations", "procedures"
+    ]
+  },
+  "fhir_bundle": {
+    "demographics": {
+      "resourceType": "Patient",
+      "id": "PT-006",
+      "name": [{"use": "official", "family": "Chen", "given": ["Li"]}],
+      "gender": "female",
+      "birthDate": "1987-09-03"
+    },
+    "conditions": [
+      {"resourceType": "Condition", "id": "COND-006-01", "clinicalStatus": {"coding": [{"code": "active"}]}, "code": {"coding": [{"code": "F32.1"}], "text": "Major depressive disorder, single episode, moderate"}, "subject": {"reference": "Patient/PT-006"}, "onsetDateTime": "2024-02-01"},
+      {"resourceType": "Condition", "id": "COND-006-02", "clinicalStatus": {"coding": [{"code": "active"}]}, "code": {"coding": [{"code": "F41.1"}], "text": "Generalized anxiety disorder"}, "subject": {"reference": "Patient/PT-006"}, "onsetDateTime": "2022-06-01"},
+      {"resourceType": "Condition", "id": "COND-006-03", "clinicalStatus": {"coding": [{"code": "active"}]}, "code": {"coding": [{"code": "G47.00"}], "text": "Insomnia disorder"}, "subject": {"reference": "Patient/PT-006"}},
+      {"resourceType": "Condition", "id": "COND-006-04", "clinicalStatus": {"coding": [{"code": "inactive"}]}, "code": {"coding": [{"code": "F32.9"}], "text": "Major depressive episode — prior episode 2019, fully remitted"}, "subject": {"reference": "Patient/PT-006"}}
+    ],
+    "medications": [
+      {"resourceType": "MedicationRequest", "id": "MED-006-01", "status": "active", "medicationCodeableConcept": {"text": "Sertraline (Zoloft) 100mg daily"}, "subject": {"reference": "Patient/PT-006"}, "authoredOn": "2024-03-01", "note": [{"text": "Titrated from 50mg to 100mg at 6-week follow-up; good tolerability"}]},
+      {"resourceType": "MedicationRequest", "id": "MED-006-02", "status": "active", "medicationCodeableConcept": {"text": "Melatonin 5mg at bedtime (OTC)"}, "subject": {"reference": "Patient/PT-006"}, "authoredOn": "2024-04-01"},
+      {"resourceType": "MedicationRequest", "id": "MED-006-03", "status": "stopped", "medicationCodeableConcept": {"text": "Lorazepam 0.5mg PRN (benzodiazepine)"}, "subject": {"reference": "Patient/PT-006"}, "note": [{"text": "Discontinued after 4 weeks — patient preferred non-benzo approach; no dependence"}]}
+    ],
+    "allergies": [
+      {
+        "resourceType": "AllergyIntolerance",
+        "id": "ALLERGY-006-01",
+        "clinicalStatus": {"coding": [{"code": "active"}]},
+        "code": {"text": "Bupropion (Wellbutrin)"},
+        "patient": {"reference": "Patient/PT-006"},
+        "reaction": [{"manifestation": [{"text": "Increased anxiety, agitation, palpitations"}], "severity": "moderate"}],
+        "note": [{"text": "Tried briefly in 2022; discontinued due to intolerable anxiety worsening"}]
+      }
+    ],
+    "labs": [
+      {"resourceType": "Observation", "id": "LAB-006-01", "status": "final", "code": {"text": "PHQ-9 (Patient Health Questionnaire)"}, "subject": {"reference": "Patient/PT-006"}, "effectiveDateTime": "2024-02-01", "valueQuantity": {"value": 18, "unit": "score"}, "note": [{"text": "Baseline — moderately severe depression"}]},
+      {"resourceType": "Observation", "id": "LAB-006-02", "status": "final", "code": {"text": "PHQ-9"}, "subject": {"reference": "Patient/PT-006"}, "effectiveDateTime": "2024-05-01", "valueQuantity": {"value": 13, "unit": "score"}, "note": [{"text": "3 months into treatment — moderate improvement"}]},
+      {"resourceType": "Observation", "id": "LAB-006-03", "status": "final", "code": {"text": "PHQ-9"}, "subject": {"reference": "Patient/PT-006"}, "effectiveDateTime": "2024-09-01", "valueQuantity": {"value": 9, "unit": "score"}, "note": [{"text": "7 months — mild depression range"}]},
+      {"resourceType": "Observation", "id": "LAB-006-04", "status": "final", "code": {"text": "PHQ-9"}, "subject": {"reference": "Patient/PT-006"}, "effectiveDateTime": "2025-11-01", "valueQuantity": {"value": 7, "unit": "score"}, "note": [{"text": "Current — mild range; patient reports significant improvement in function"}]},
+      {"resourceType": "Observation", "id": "LAB-006-05", "status": "final", "code": {"text": "GAD-7 (Generalized Anxiety Disorder scale)"}, "subject": {"reference": "Patient/PT-006"}, "effectiveDateTime": "2025-11-01", "valueQuantity": {"value": 8, "unit": "score"}, "note": [{"text": "Mild-moderate anxiety; improved from baseline GAD-7 of 15"}]},
+      {"resourceType": "Observation", "id": "LAB-006-06", "status": "final", "code": {"text": "TSH (thyroid stimulating hormone)"}, "subject": {"reference": "Patient/PT-006"}, "effectiveDateTime": "2024-02-01", "valueQuantity": {"value": 1.9, "unit": "mIU/L"}, "note": [{"text": "Screened at initial workup — normal"}]},
+      {"resourceType": "Observation", "id": "LAB-006-07", "status": "final", "code": {"text": "Columbia Suicide Severity Rating Scale (C-SSRS)"}, "subject": {"reference": "Patient/PT-006"}, "effectiveDateTime": "2025-11-01", "valueQuantity": {"value": 0, "unit": "score"}, "note": [{"text": "No suicidal ideation at current visit"}]}
+    ],
+    "vitals": [
+      {"resourceType": "Observation", "id": "VIT-006-01", "status": "final", "code": {"text": "Blood Pressure"}, "subject": {"reference": "Patient/PT-006"}, "effectiveDateTime": "2025-11-01", "component": [{"code": {"text": "Systolic"}, "valueQuantity": {"value": 122, "unit": "mmHg"}}, {"code": {"text": "Diastolic"}, "valueQuantity": {"value": 78, "unit": "mmHg"}}]},
+      {"resourceType": "Observation", "id": "VIT-006-02", "status": "final", "code": {"text": "Weight"}, "subject": {"reference": "Patient/PT-006"}, "effectiveDateTime": "2025-11-01", "valueQuantity": {"value": 148, "unit": "lbs"}},
+      {"resourceType": "Observation", "id": "VIT-006-03", "status": "final", "code": {"text": "BMI"}, "subject": {"reference": "Patient/PT-006"}, "effectiveDateTime": "2025-11-01", "valueQuantity": {"value": 24.3, "unit": "kg/m2"}}
+    ],
+    "encounters": [
+      {"resourceType": "Encounter", "id": "ENC-006-01", "status": "finished", "type": [{"text": "Psychiatry Initial Evaluation"}], "subject": {"reference": "Patient/PT-006"}, "period": {"start": "2024-02-01"}},
+      {"resourceType": "Encounter", "id": "ENC-006-02", "status": "finished", "type": [{"text": "Psychiatry Follow-up (medication management)"}], "subject": {"reference": "Patient/PT-006"}, "period": {"start": "2024-03-15"}},
+      {"resourceType": "Encounter", "id": "ENC-006-03", "status": "finished", "type": [{"text": "Psychiatry Follow-up — sertraline uptitration to 100mg"}], "subject": {"reference": "Patient/PT-006"}, "period": {"start": "2024-05-01"}},
+      {"resourceType": "Encounter", "id": "ENC-006-04", "status": "finished", "type": [{"text": "Psychiatry Follow-up"}], "subject": {"reference": "Patient/PT-006"}, "period": {"start": "2024-09-01"}},
+      {"resourceType": "Encounter", "id": "ENC-006-05", "status": "finished", "type": [{"text": "Psychiatry Follow-up (current)"}], "subject": {"reference": "Patient/PT-006"}, "period": {"start": "2025-11-01"}},
+      {"resourceType": "Encounter", "id": "ENC-006-06", "status": "finished", "type": [{"text": "Individual psychotherapy (CBT) — ongoing, weekly sessions"}], "subject": {"reference": "Patient/PT-006"}, "period": {"start": "2024-03-01"}}
+    ],
+    "immunizations": [
+      {"resourceType": "Immunization", "status": "completed", "vaccineCode": {"text": "Influenza vaccine"}, "patient": {"reference": "Patient/PT-006"}, "occurrenceDateTime": "2025-10-10"},
+      {"resourceType": "Immunization", "status": "completed", "vaccineCode": {"text": "HPV vaccine series complete"}, "patient": {"reference": "Patient/PT-006"}, "occurrenceDateTime": "2010-08-01"}
+    ],
+    "procedures": []
+  },
+  "gold_standard_summary": "## Patient Summary — Li Chen (DOB: 1987-09-03, Female, Age 38)\n\n**⚠️ INTOLERANCE: Bupropion (Wellbutrin) — increased anxiety, agitation, palpitations. Do NOT prescribe bupropion or combination products.**\n\n**Active Conditions:** Major depressive disorder (moderate, single episode — onset Feb 2024); Generalized anxiety disorder (onset 2022); Insomnia disorder. Prior MDD episode 2019, fully remitted.\n\n**Medications:** Sertraline 100mg daily (titrated from 50mg; good tolerability); Melatonin 5mg QHS (OTC). Lorazepam discontinued — patient preference, no dependence.\n\n**PHQ-9 Trend (significant improvement):**\n- Feb 2024: 18 (moderately severe) → May 2024: 13 → Sep 2024: 9 → Nov 2025: 7 (mild)\nGAD-7 improved from 15 to 8 (mild-moderate). No suicidal ideation (C-SSRS 0) at current visit.\n\n**Vitals:** BP 122/78 mmHg, BMI 24.3 kg/m².\n\n**Treatment:** Weekly CBT psychotherapy in progress since March 2024. TSH 1.9 mIU/L (normal, screened at onset).\n\n**Clinical Impression:** Good treatment response on sertraline + CBT. PHQ-9 trending toward remission (<5). Insomnia improving with melatonin. No current safety concerns. Bupropion contraindicated.\n\n---\n⚠️ DRAFT — AI-GENERATED — REQUIRES CLINICIAN REVIEW",
+  "must_appear": [
+    "sertraline", "PHQ-9", "18", "7", "MDD", "anxiety", "GAD",
+    "bupropion", "CBT", "no suicidal ideation"
+  ],
+  "must_not_appear": [
+    "suicidal", "lithium", "antipsychotic", "bipolar", "schizophrenia",
+    "bupropion safe", "no psychiatric history"
+  ],
+  "expected_items": {
+    "medications": ["sertraline", "melatonin"],
+    "conditions": ["major depressive disorder", "anxiety", "insomnia"],
+    "labs": ["PHQ-9", "18", "7", "GAD-7"],
+    "allergies": ["bupropion"]
+  },
+  "expected_status": ["complete"],
+  "min_confidence_level": "YELLOW",
+  "is_safety_gate": false
+}

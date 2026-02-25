@@ -48,6 +48,45 @@ logger = get_logger(__name__)
 _AUDITED_BASE_PATHS = ("/summarize",)
 
 
+class SecurityHeadersMiddleware(BaseHTTPMiddleware):
+    """
+    Attach security headers to every response (Helmet-style).
+
+    Headers set:
+      - X-Content-Type-Options: nosniff        (prevent MIME-sniffing)
+      - X-Frame-Options: DENY                  (block iframe embedding)
+      - X-XSS-Protection: 1; mode=block        (legacy XSS filter)
+      - Strict-Transport-Security              (enforce HTTPS, 1 year)
+      - Content-Security-Policy                (restrict resource origins)
+      - Referrer-Policy                        (limit referrer leakage)
+      - Permissions-Policy                     (disable unused browser features)
+      - Server header removed                  (hide runtime fingerprint)
+    """
+
+    # CSP appropriate for a JSON API service — the agent renders no HTML.
+    _CSP = "default-src 'none'; frame-ancestors 'none'; form-action 'none'"
+
+    def __init__(self, app: ASGIApp) -> None:
+        super().__init__(app)
+
+    async def dispatch(self, request: Request, call_next: Callable) -> Response:
+        response = await call_next(request)
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["X-Frame-Options"] = "DENY"
+        response.headers["X-XSS-Protection"] = "1; mode=block"
+        response.headers["Strict-Transport-Security"] = (
+            "max-age=31536000; includeSubDomains"
+        )
+        response.headers["Content-Security-Policy"] = self._CSP
+        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+        response.headers["Permissions-Policy"] = (
+            "geolocation=(), microphone=(), camera=()"
+        )
+        # Remove the Server header to avoid advertising the runtime version.
+        response.headers.pop("server", None)
+        return response
+
+
 class RequestLoggingMiddleware(BaseHTTPMiddleware):
     """
     Log every incoming request and its response status/latency.

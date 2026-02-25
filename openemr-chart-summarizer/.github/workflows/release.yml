@@ -1,0 +1,160 @@
+# Release workflow — triggered on version tags (v*.*.*).
+# Copyright (C) 2026 OpenEMR Community — GPL v3
+#
+# On a tag push (e.g. git tag v1.0.0 && git push --tags):
+#   1. Builds the multi-stage Docker image
+#   2. Pushes to GitHub Container Registry (ghcr.io)
+#   3. Runs the eval suite and attaches results
+#   4. Creates a GitHub Release with conventional-commit release notes
+
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}/chart-summarizer-agent
+
+jobs:
+  release:
+    name: Build, Push & Release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write      # Create GitHub Release
+      packages: write      # Push to ghcr.io
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0    # Full history for release notes
+
+      # -----------------------------------------------------------------------
+      # Extract version from tag
+      # -----------------------------------------------------------------------
+      - name: Extract version
+        id: version
+        run: |
+          TAG="${GITHUB_REF#refs/tags/}"
+          VERSION="${TAG#v}"
+          echo "TAG=$TAG"           >> $GITHUB_OUTPUT
+          echo "VERSION=$VERSION"   >> $GITHUB_OUTPUT
+          echo "PRERELEASE=$([[ $TAG == *'-'* ]] && echo 'true' || echo 'false')" >> $GITHUB_OUTPUT
+
+      # -----------------------------------------------------------------------
+      # Build & push Docker image
+      # -----------------------------------------------------------------------
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./agent
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.VERSION }}
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+          labels: |
+            org.opencontainers.image.version=${{ steps.version.outputs.VERSION }}
+            org.opencontainers.image.source=${{ github.repositoryUrl }}
+            org.opencontainers.image.revision=${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # -----------------------------------------------------------------------
+      # Run eval suite to attach results to the release
+      # -----------------------------------------------------------------------
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Run eval suite for release evidence
+        run: |
+          pip install -r agent/requirements.txt
+          pip install -e agent/ --no-deps
+          pip install rouge-score
+          python eval/scripts/run_eval.py \
+            --output-dir eval/results/release-${{ steps.version.outputs.VERSION }} \
+            || echo "Eval had failures — attaching results anyway"
+
+      - name: Upload eval results artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: eval-results-${{ steps.version.outputs.TAG }}
+          path: eval/results/release-${{ steps.version.outputs.VERSION }}/
+          retention-days: 90
+
+      # -----------------------------------------------------------------------
+      # Generate GitHub Release with release notes + eval summary
+      # -----------------------------------------------------------------------
+      - name: Generate release notes
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const version = '${{ steps.version.outputs.VERSION }}';
+            const tag = '${{ steps.version.outputs.TAG }}';
+            const image = `${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${version}`;
+            const prerelease = ${{ steps.version.outputs.PRERELEASE }};
+
+            // Read eval results
+            let evalSummary = '_Eval results not available._';
+            let evalReport = '';
+            try {
+              const results = JSON.parse(
+                fs.readFileSync(`eval/results/release-${version}/results.json`, 'utf8')
+              );
+              const passed = results.filter(r => r.passed).length;
+              const total = results.length;
+              const safetyFails = results.filter(r => !r.passed && r.is_safety_gate).length;
+              evalSummary = `${passed}/${total} cases passed`;
+              if (safetyFails > 0) evalSummary += ` ⚠️ ${safetyFails} safety gate failure(s)`;
+            } catch(e) {}
+            try {
+              evalReport = fs.readFileSync(`eval/results/release-${version}/report.txt`, 'utf8');
+            } catch(e) {}
+
+            const body = [
+              '## What\'s Changed',
+              '',
+              '_See commit history for detailed changes._',
+              '',
+              '## Docker Image',
+              '',
+              `Pull the image:`,
+              '```bash',
+              `docker pull ${image}`,
+              '```',
+              '',
+              '## Eval Results',
+              '',
+              evalSummary,
+              '',
+              evalReport ? '<details><summary>Full eval report</summary>\n\n```\n' + evalReport + '\n```\n</details>' : '',
+              '',
+              '## HIPAA Deployment Checklist',
+              '',
+              'See [docs/hipaa-deployment.md](docs/hipaa-deployment.md) before deploying to production.',
+            ].join('\n');
+
+            await github.rest.repos.createRelease({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              tag_name: tag,
+              name: `Release ${tag}`,
+              body,
+              draft: false,
+              prerelease,
+              make_latest: !prerelease ? 'true' : 'false',
+            });

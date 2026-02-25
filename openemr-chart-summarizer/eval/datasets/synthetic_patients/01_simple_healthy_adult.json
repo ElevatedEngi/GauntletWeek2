@@ -1,0 +1,178 @@
+{
+  "case_id": "01_simple_healthy_adult",
+  "description": "35yo healthy male, annual physical, mild hypertension controlled on 2 meds",
+  "metadata": {
+    "complexity": "simple",
+    "primary_specialty": "primary_care"
+  },
+  "summary_request": {
+    "patient_id": "PT-001",
+    "specialty": "primary_care",
+    "date_range_months": 12,
+    "requested_sections": [
+      "demographics", "conditions", "medications", "allergies",
+      "labs", "vitals", "encounters", "immunizations", "procedures"
+    ]
+  },
+  "fhir_bundle": {
+    "demographics": {
+      "resourceType": "Patient",
+      "id": "PT-001",
+      "name": [{"use": "official", "family": "Smith", "given": ["John"]}],
+      "gender": "male",
+      "birthDate": "1990-03-15",
+      "address": [{"city": "Boston", "state": "MA", "postalCode": "02108"}]
+    },
+    "conditions": [
+      {
+        "resourceType": "Condition",
+        "id": "COND-001-01",
+        "clinicalStatus": {"coding": [{"code": "active"}]},
+        "code": {"coding": [{"system": "http://hl7.org/fhir/sid/icd-10-cm", "code": "I10", "display": "Essential hypertension"}], "text": "Essential hypertension"},
+        "subject": {"reference": "Patient/PT-001"},
+        "onsetDateTime": "2022-06-10",
+        "recordedDate": "2022-06-10"
+      }
+    ],
+    "medications": [
+      {
+        "resourceType": "MedicationRequest",
+        "id": "MED-001-01",
+        "status": "active",
+        "medicationCodeableConcept": {"coding": [{"code": "29046", "display": "Lisinopril 10mg oral tablet"}], "text": "Lisinopril 10mg"},
+        "subject": {"reference": "Patient/PT-001"},
+        "dosageInstruction": [{"text": "10mg daily", "doseAndRate": [{"doseQuantity": {"value": 10, "unit": "mg"}}]}]
+      },
+      {
+        "resourceType": "MedicationRequest",
+        "id": "MED-001-02",
+        "status": "active",
+        "medicationCodeableConcept": {"coding": [{"code": "11253", "display": "Vitamin D 2000 IU"}], "text": "Vitamin D 2000 IU"},
+        "subject": {"reference": "Patient/PT-001"},
+        "dosageInstruction": [{"text": "2000 IU daily"}]
+      }
+    ],
+    "allergies": [
+      {
+        "resourceType": "AllergyIntolerance",
+        "id": "ALLERGY-001-01",
+        "clinicalStatus": {"coding": [{"code": "active"}]},
+        "code": {"text": "No known allergies"},
+        "patient": {"reference": "Patient/PT-001"},
+        "note": [{"text": "NKA — no known allergies documented"}]
+      }
+    ],
+    "labs": [
+      {
+        "resourceType": "Observation",
+        "id": "LAB-001-01",
+        "status": "final",
+        "code": {"coding": [{"code": "2093-3", "display": "Cholesterol [Mass/volume] in Serum or Plasma"}], "text": "Total Cholesterol"},
+        "subject": {"reference": "Patient/PT-001"},
+        "effectiveDateTime": "2025-11-15",
+        "valueQuantity": {"value": 195, "unit": "mg/dL"}
+      },
+      {
+        "resourceType": "Observation",
+        "id": "LAB-001-02",
+        "status": "final",
+        "code": {"coding": [{"code": "13457-7", "display": "LDL Cholesterol"}], "text": "LDL Cholesterol"},
+        "subject": {"reference": "Patient/PT-001"},
+        "effectiveDateTime": "2025-11-15",
+        "valueQuantity": {"value": 115, "unit": "mg/dL"}
+      },
+      {
+        "resourceType": "Observation",
+        "id": "LAB-001-03",
+        "status": "final",
+        "code": {"coding": [{"code": "4548-4", "display": "Hemoglobin A1c"}], "text": "HbA1c"},
+        "subject": {"reference": "Patient/PT-001"},
+        "effectiveDateTime": "2025-11-15",
+        "valueQuantity": {"value": 5.4, "unit": "%"}
+      },
+      {
+        "resourceType": "Observation",
+        "id": "LAB-001-04",
+        "status": "final",
+        "code": {"coding": [{"code": "33914-3", "display": "eGFR"}], "text": "eGFR"},
+        "subject": {"reference": "Patient/PT-001"},
+        "effectiveDateTime": "2025-11-15",
+        "valueQuantity": {"value": 82, "unit": "mL/min"}
+      }
+    ],
+    "vitals": [
+      {
+        "resourceType": "Observation",
+        "id": "VIT-001-01",
+        "status": "final",
+        "category": [{"coding": [{"code": "vital-signs"}]}],
+        "code": {"coding": [{"code": "55284-4", "display": "Blood pressure systolic and diastolic"}], "text": "Blood Pressure"},
+        "subject": {"reference": "Patient/PT-001"},
+        "effectiveDateTime": "2025-11-15",
+        "component": [
+          {"code": {"text": "Systolic BP"}, "valueQuantity": {"value": 128, "unit": "mmHg"}},
+          {"code": {"text": "Diastolic BP"}, "valueQuantity": {"value": 82, "unit": "mmHg"}}
+        ]
+      },
+      {
+        "resourceType": "Observation",
+        "id": "VIT-001-02",
+        "status": "final",
+        "code": {"text": "BMI"},
+        "subject": {"reference": "Patient/PT-001"},
+        "effectiveDateTime": "2025-11-15",
+        "valueQuantity": {"value": 24.5, "unit": "kg/m2"}
+      }
+    ],
+    "encounters": [
+      {
+        "resourceType": "Encounter",
+        "id": "ENC-001-01",
+        "status": "finished",
+        "class": {"code": "AMB"},
+        "type": [{"text": "Annual Physical Examination"}],
+        "subject": {"reference": "Patient/PT-001"},
+        "period": {"start": "2025-11-15", "end": "2025-11-15"},
+        "serviceProvider": {"display": "Boston Primary Care Associates"}
+      }
+    ],
+    "immunizations": [
+      {
+        "resourceType": "Immunization",
+        "id": "IMM-001-01",
+        "status": "completed",
+        "vaccineCode": {"coding": [{"code": "158", "display": "Influenza vaccine"}], "text": "Influenza (Flu) vaccine"},
+        "patient": {"reference": "Patient/PT-001"},
+        "occurrenceDateTime": "2025-10-01"
+      },
+      {
+        "resourceType": "Immunization",
+        "id": "IMM-001-02",
+        "status": "completed",
+        "vaccineCode": {"text": "COVID-19 booster (mRNA)"},
+        "patient": {"reference": "Patient/PT-001"},
+        "occurrenceDateTime": "2024-09-15"
+      }
+    ],
+    "procedures": []
+  },
+  "gold_standard_summary": "## Patient Summary — John Smith (DOB: 1990-03-15, Male)\n\n**Chief Concern / Visit Type:** Annual preventive physical examination.\n\n**Active Conditions:**\n- Essential hypertension (I10), diagnosed June 2022, currently well-controlled on Lisinopril.\n\n**Medications (2):**\n1. Lisinopril 10 mg daily (hypertension)\n2. Vitamin D 2,000 IU daily (supplementation)\n\n**Allergies:** No known allergies (NKA).\n\n**Recent Labs (2025-11-15):**\n- Total Cholesterol: 195 mg/dL (borderline; no statin indicated at this time)\n- LDL: 115 mg/dL\n- HbA1c: 5.4% (normal — no diabetes)\n- eGFR: 82 mL/min (normal kidney function)\n\n**Vitals (2025-11-15):** BP 128/82 mmHg (improved), BMI 24.5 (normal weight).\n\n**Immunizations:** Flu vaccine 2025-10-01 (current); COVID-19 booster 2024-09-15.\n\n**Clinical Impression:** Healthy 35-year-old male with controlled hypertension. No diabetic risk at this time. Cholesterol borderline — lifestyle counseling recommended. Continue Lisinopril and annual follow-up.\n\n---\n⚠️ DRAFT — AI-GENERATED — REQUIRES CLINICIAN REVIEW",
+  "must_appear": [
+    "Lisinopril", "10mg", "hypertension", "cholesterol", "195", "A1C", "5.4",
+    "vitamin D", "no known allergies", "BMI", "annual"
+  ],
+  "must_not_appear": [
+    "diabetes", "cancer", "heart failure", "kidney disease",
+    "penicillin allergy", "sulfa allergy", "metformin", "insulin"
+  ],
+  "expected_items": {
+    "medications": ["Lisinopril", "Vitamin D"],
+    "conditions": ["hypertension"],
+    "labs": ["cholesterol", "195", "A1C", "5.4"],
+    "allergies": ["no known allergies"],
+    "vitals": ["BMI"]
+  },
+  "expected_status": ["complete"],
+  "min_confidence_level": "GREEN",
+  "is_safety_gate": false
+}

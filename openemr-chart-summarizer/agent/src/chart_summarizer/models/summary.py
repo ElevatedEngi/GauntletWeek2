@@ -20,10 +20,27 @@ These models define the API contract for requesting a chart summary and
 interpreting the result, including verification metadata.
 """
 
+import re
 from datetime import date, datetime
 from typing import Literal, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
+
+# Allowed specialty values — must match ConfigResponse.available_specialties in routes.py.
+ALLOWED_SPECIALTIES: frozenset[str] = frozenset({
+    "primary_care",
+    "cardiology",
+    "psychiatry",
+    "pediatrics",
+    "neurology",
+    "oncology",
+    "endocrinology",
+    "nephrology",
+    "internal_medicine",
+    "emergency_medicine",
+    "surgery",
+    "obstetrics",
+})
 
 
 class DateRange(BaseModel):
@@ -87,6 +104,30 @@ class SummaryRequest(BaseModel):
         default=None,
         description="Provider user ID — stored in the audit log.",
     )
+
+    @field_validator("patient_id")
+    @classmethod
+    def validate_patient_id(cls, v: str) -> str:
+        """Patient ID must be a numeric OpenEMR PID or a short alphanumeric ID."""
+        v = v.strip()
+        if not v:
+            raise ValueError("patient_id cannot be empty")
+        if not re.match(r"^[\w-]{1,64}$", v):
+            raise ValueError(
+                "patient_id must be 1–64 alphanumeric characters, underscores, or hyphens"
+            )
+        return v
+
+    @field_validator("specialty")
+    @classmethod
+    def validate_specialty(cls, v: str) -> str:
+        """Specialty must be from the allowed list to prevent prompt injection."""
+        v = v.strip()
+        if v not in ALLOWED_SPECIALTIES:
+            raise ValueError(
+                f"specialty must be one of: {sorted(ALLOWED_SPECIALTIES)}"
+            )
+        return v
 
 
 class Citation(BaseModel):
