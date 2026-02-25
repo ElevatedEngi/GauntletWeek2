@@ -87,9 +87,9 @@
 
         const formData = new FormData(form);
         const payload = {
-            patient_id: formData.get('patient_pid'),
-            specialty:  formData.get('specialty'),
-            months:     parseInt(formData.get('months') || '12', 10),
+            patient_id:        formData.get('patient_pid'),
+            specialty:         formData.get('specialty'),
+            date_range_months: parseInt(formData.get('months') || '12', 10),
         };
 
         // Update loading message after 5 seconds to reassure the user
@@ -98,7 +98,7 @@
         }, 5000);
 
         try {
-            const response = await fetch('/modules/ChartSummarizer/summarize', {
+            const response = await fetch('/modules/ChartSummarizer/generate', {
                 method:  'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body:    JSON.stringify(payload),

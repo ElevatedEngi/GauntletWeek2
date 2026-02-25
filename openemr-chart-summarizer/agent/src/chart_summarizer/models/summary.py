@@ -51,11 +51,22 @@ class SummaryRequest(BaseModel):
             "E.g. 'primary_care', 'cardiology', 'psychiatry', 'pediatrics'."
         ),
     )
+    date_range_months: Optional[int] = Field(
+        default=12,
+        ge=1,
+        le=120,
+        description=(
+            "Look-back window in months from today. "
+            "Used when date_range is not explicitly specified. "
+            "Clamped to [1, 120]."
+        ),
+    )
     date_range: Optional[DateRange] = Field(
         default=None,
         description=(
-            "Restrict data retrieval to this window. "
-            "Defaults to the last SUMMARY_DEFAULT_MONTHS months when omitted."
+            "Explicit date range to restrict data retrieval. "
+            "When provided, overrides date_range_months. "
+            "Defaults to the last date_range_months months when omitted."
         ),
     )
     requested_sections: list[str] = Field(

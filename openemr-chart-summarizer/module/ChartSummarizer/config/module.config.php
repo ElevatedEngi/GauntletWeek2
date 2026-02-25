@@ -40,11 +40,18 @@ return [
                 ],
                 'may_terminate' => true,
                 'child_routes'  => [
-                    'summarize' => [
+                    'generate' => [
                         'type'    => \Laminas\Router\Http\Literal::class,
                         'options' => [
-                            'route'    => '/summarize',
-                            'defaults' => ['action' => 'summarize'],
+                            'route'    => '/generate',
+                            'defaults' => ['action' => 'generate'],
+                        ],
+                    ],
+                    'feedback' => [
+                        'type'    => \Laminas\Router\Http\Literal::class,
+                        'options' => [
+                            'route'    => '/feedback',
+                            'defaults' => ['action' => 'feedback'],
                         ],
                     ],
                     'settings' => [

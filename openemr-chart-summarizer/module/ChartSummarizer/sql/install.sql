@@ -19,6 +19,40 @@
 
 
 -- ---------------------------------------------------------------------------
+-- chart_summarizer_config
+-- Module configuration: agent service URL and AES-256 encrypted API key.
+-- Only one row is expected (id=1). Admin updates via the settings page.
+-- ---------------------------------------------------------------------------
+
+CREATE TABLE IF NOT EXISTS `chart_summarizer_config` (
+    `id`                TINYINT UNSIGNED NOT NULL DEFAULT 1,
+    `agent_base_url`    VARCHAR(512) NOT NULL DEFAULT 'http://chart-summarizer-agent:8000'
+                        COMMENT 'Base URL for the Python summarizer microservice',
+    -- api_key_enc stores the CHART_SUMMARIZER_API_KEY encrypted with AES-256-CBC
+    -- using OpenEMR's site encryption key. Never store the key in plaintext.
+    `api_key_enc`       TEXT DEFAULT NULL
+                        COMMENT 'AES-256-CBC encrypted shared API key (base64)',
+    `api_key_iv`        VARCHAR(64) DEFAULT NULL
+                        COMMENT 'Base64-encoded IV used for api_key_enc',
+    `request_timeout_s` SMALLINT UNSIGNED NOT NULL DEFAULT 30
+                        COMMENT 'cURL timeout in seconds for calls to the agent',
+    `rate_limit_per_hour` SMALLINT UNSIGNED NOT NULL DEFAULT 20
+                        COMMENT 'Max summary requests per user per hour (client-side guard)',
+    `show_disclaimer`   TINYINT(1) NOT NULL DEFAULT 1
+                        COMMENT 'Display the AI-generated disclaimer on all summaries',
+    `allow_save_to_chart` TINYINT(1) NOT NULL DEFAULT 0
+                        COMMENT 'Allow clinicians to save approved summaries to the chart',
+    `updated_at`        DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+                        ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+  COMMENT='Chart Summarizer module configuration (single-row settings table)';
+
+-- Insert the default configuration row so it always exists after install.
+INSERT IGNORE INTO `chart_summarizer_config` (`id`) VALUES (1);
+
+
+-- ---------------------------------------------------------------------------
 -- chart_summarizer_requests
 -- Audit log and status tracker for every summary generation request.
 -- ---------------------------------------------------------------------------

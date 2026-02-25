@@ -33,7 +33,7 @@ use OpenEMR\Common\Acl\AclMain;
  *
  * Routes:
  *   GET  /modules/ChartSummarizer              → indexAction()      (summary viewer)
- *   POST /modules/ChartSummarizer/summarize    → summarizeAction()  (trigger generation)
+ *   POST /modules/ChartSummarizer/generate     → generateAction()   (trigger generation)
  *   POST /modules/ChartSummarizer/feedback     → feedbackAction()   (submit feedback)
  *   GET  /modules/ChartSummarizer/settings     → settingsAction()   (admin config)
  *
@@ -83,19 +83,22 @@ class SummarizerController extends AbstractActionController
     /**
      * Generate a chart summary via the Python agent.
      *
+     * Called from POST /modules/ChartSummarizer/generate
+     *
      * Expected POST fields:
      *   patient_id           string  (required) — OpenEMR PID
      *   specialty            string  (optional, default: primary_care)
+     *   date_range_months    int     (optional, default: 12) — look-back window
      *   requested_sections   array   (optional, default: all sections)
      *
-     * Returns JSON-encoded SummaryResponse from the Python agent, or an error
-     * object with an "error" key on failure.
+     * Forwards the logged-in user's session token to the Python agent for auth.
+     * Returns JSON-encoded SummaryResponse, or an error object on failure.
      *
      * ACL required: patients / docs.
      *
      * @return JsonModel
      */
-    public function summarizeAction(): JsonModel
+    public function generateAction(): JsonModel
     {
         if (!$this->getRequest()->isPost()) {
             $this->getResponse()->setStatusCode(405);
@@ -107,9 +110,10 @@ class SummarizerController extends AbstractActionController
             return new JsonModel(['error' => 'Access denied.', 'code' => 403]);
         }
 
-        $post      = $this->getRequest()->getPost();
-        $patientId = trim((string) ($post['patient_id'] ?? ''));
-        $specialty = trim((string) ($post['specialty'] ?? 'primary_care'));
+        $post             = $this->getRequest()->getPost();
+        $patientId        = trim((string) ($post['patient_id'] ?? ''));
+        $specialty        = trim((string) ($post['specialty'] ?? 'primary_care'));
+        $dateRangeMonths  = max(0, min(120, (int) ($post['date_range_months'] ?? 12)));
 
         if ($patientId === '') {
             $this->getResponse()->setStatusCode(400);
@@ -128,12 +132,16 @@ class SummarizerController extends AbstractActionController
         $payload = [
             'patient_id'             => $patientId,
             'specialty'              => $specialty,
+            'date_range_months'      => $dateRangeMonths,
             'requested_sections'     => $sections,
             'requesting_provider_id' => $_SESSION['authUserID'] ?? null,
         ];
 
+        // Forward the OpenEMR session token so the Python agent can validate it
+        // via OAuth2 introspection. Falls back to the shared AGENT_API_KEY.
+        $sessionToken = $_SESSION['authToken'] ?? '';
         try {
-            $response = $this->callMicroservice('/api/v1/summarize', $payload);
+            $response = $this->callMicroservice('/api/v1/summarize', $payload, $sessionToken);
         } catch (\RuntimeException $e) {
             $this->getResponse()->setStatusCode(502);
             return new JsonModel(['error' => $e->getMessage(), 'code' => 502]);
@@ -248,12 +256,14 @@ class SummarizerController extends AbstractActionController
     /**
      * Forward a JSON request to the Python microservice via cURL.
      *
-     * Sends ``Authorization: Bearer <key>`` when CHART_SUMMARIZER_API_KEY is
-     * set in the environment. The PHP module's session token is forwarded as-is
-     * so the Python agent can validate it via OpenEMR's OAuth2 introspection.
+     * Auth precedence:
+     *  1. If $sessionToken is provided (OpenEMR OAuth2 token), forward it so
+     *     the Python agent can validate via introspection.
+     *  2. Otherwise fall back to the shared CHART_SUMMARIZER_API_KEY.
      *
-     * @param string               $path    API path, e.g. '/api/v1/summarize'.
-     * @param array<string, mixed> $payload JSON-serialisable request body.
+     * @param string               $path         API path, e.g. '/api/v1/summarize'.
+     * @param array<string, mixed> $payload      JSON-serialisable request body.
+     * @param string               $sessionToken Optional OpenEMR OAuth2 token to forward.
      *
      * @return array<string, mixed> Decoded JSON response body.
      *
@@ -261,12 +271,13 @@ class SummarizerController extends AbstractActionController
      *                           non-2xx response code.
      * @throws \JsonException    If the response body is not valid JSON.
      */
-    private function callMicroservice(string $path, array $payload): array
+    private function callMicroservice(string $path, array $payload, string $sessionToken = ''): array
     {
         $baseUrl  = rtrim((string) ($this->moduleConfig['agent_base_url'] ?? 'http://chart-summarizer-agent:8000'), '/');
         $url      = $baseUrl . $path;
         $timeout  = (int) ($this->moduleConfig['request_timeout_s'] ?? 30);
-        $apiKey   = (string) (getenv('CHART_SUMMARIZER_API_KEY') ?: '');
+        // Prefer the forwarded session token; fall back to the shared API key.
+        $apiKey   = $sessionToken !== '' ? $sessionToken : (string) (getenv('CHART_SUMMARIZER_API_KEY') ?: '');
 
         $jsonBody = json_encode($payload, JSON_THROW_ON_ERROR);
 
